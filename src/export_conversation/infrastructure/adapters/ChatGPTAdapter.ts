@@ -2,8 +2,7 @@ import { IAAdapter } from '../../../core/domain/IAAdapter';
 import { Message, Role } from '../../../core/domain/entities';
 
 export class ChatGPTAdapter implements IAAdapter {
-  // Selector basado en la estructura actual de ChatGPT
-  private readonly MESSAGE_SELECTOR = 'div[data-message-author-role]';
+  private readonly MESSAGE_SELECTOR = 'article';
   private readonly CHECKBOX_CLASS = 'ai-exporter-checkbox';
 
   isCurrentPage(): boolean {
@@ -16,17 +15,19 @@ export class ChatGPTAdapter implements IAAdapter {
     const messages: Message[] = [];
 
     elements.forEach((el, index) => {
-      const roleAttr = el.getAttribute('data-message-author-role');
-      const role: Role = roleAttr === 'assistant' ? 'assistant' : 'user';
-      
-      // Capturamos el HTML interno para preservar negritas, código, etc.
-      // Buscamos el div que contiene el texto real
-      const contentEl = el.querySelector('.markdown') || el;
+      const contentEl = el.querySelector('div.text-base') || el.querySelector('.markdown') || el;
+      if (!contentEl) return;
+
+      const isAssistant = el.querySelector('.sr-only')?.textContent?.toLowerCase().includes('chatgpt') || 
+                          el.querySelector('svg.icon-sm') || 
+                          el.querySelector('.agent-turn');
+
+      const role: Role = isAssistant ? 'assistant' : 'user';
       
       messages.push({
         id: `chatgpt-msg-${index}`,
         role,
-        content: contentEl.innerHTML 
+        content: (contentEl as HTMLElement).innerHTML // Cambiado a innerHTML
       });
     });
 
@@ -47,7 +48,7 @@ export class ChatGPTAdapter implements IAAdapter {
       checkbox.dataset.id = `chatgpt-msg-${index}`;
       checkbox.style.cssText = `
         position: absolute;
-        left: -30px;
+        left: 10px;
         top: 10px;
         z-index: 10000;
         width: 20px;

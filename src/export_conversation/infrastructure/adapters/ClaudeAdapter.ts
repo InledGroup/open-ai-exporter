@@ -2,8 +2,7 @@ import { IAAdapter } from '../../../core/domain/IAAdapter';
 import { Message, Role } from '../../../core/domain/entities';
 
 export class ClaudeAdapter implements IAAdapter {
-  // Selectores extraídos del análisis: Claude usa data-test-render-count o classes específicas
-  private readonly MESSAGE_SELECTOR = '[data-test-render-count], .font-claude-message, .font-user-message';
+  private readonly MESSAGE_SELECTOR = '[data-test-render-count]';
   private readonly CHECKBOX_CLASS = 'ai-exporter-checkbox';
 
   isCurrentPage(): boolean {
@@ -15,16 +14,19 @@ export class ClaudeAdapter implements IAAdapter {
     const messages: Message[] = [];
 
     elements.forEach((el, index) => {
-      // Heurística de rol basada en clases de Claude
-      const isAssistant = el.classList.contains('font-claude-message') || 
-                          el.querySelector('.lucide-claudebot') || 
-                          el.closest('[data-testid="assistant-message"]');
-      const role: Role = isAssistant ? 'assistant' : 'user';
+      // Lógica de detección de roles de Claude extraída de sourcecode
+      // Busca [data-testid="user-message"] dentro del contenedor
+      const isUser = el.querySelector('[data-testid="user-message"]') !== null;
+      const role: Role = isUser ? 'user' : 'assistant';
       
+      // Capturamos el contenido. Claude a menudo tiene el texto dentro de .font-claude-message o similar
+      // pero el contenedor [data-test-render-count] es el que tiene el bloque completo.
+      const contentEl = el.querySelector('.font-claude-message, .font-user-message') || el;
+
       messages.push({
         id: `claude-msg-${index}`,
         role,
-        content: (el as HTMLElement).innerText
+        content: (contentEl as HTMLElement).innerHTML
       });
     });
 
@@ -43,12 +45,16 @@ export class ClaudeAdapter implements IAAdapter {
       checkbox.type = 'checkbox';
       checkbox.className = this.CHECKBOX_CLASS;
       checkbox.dataset.id = `claude-msg-${index}`;
-      checkbox.style.position = 'absolute';
-      checkbox.style.left = '-25px';
-      checkbox.style.top = '10px';
-      checkbox.style.zIndex = '1000';
-      checkbox.style.width = '18px';
-      checkbox.style.height = '18px';
+      
+      checkbox.style.cssText = `
+        position: absolute;
+        left: -30px;
+        top: 10px;
+        z-index: 10000;
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+      `;
 
       checkbox.addEventListener('change', () => {
         onSelectionChange(this.getSelectedMessageIds());
@@ -64,6 +70,7 @@ export class ClaudeAdapter implements IAAdapter {
   }
 
   getConversationTitle(): string {
+    // Intenta sacar el título del chat del sidebar o la URL
     return document.title || 'Claude Conversation';
   }
 }
