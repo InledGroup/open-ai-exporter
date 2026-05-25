@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "AI Exporter Hexagonal",
+  "version": "1.0.1",
+  "description": "Exporta conversaciones de ChatGPT, Claude, Gemini y NotebookLM a MD y PDF.",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "action": {
+    "default_popup": "index.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://chat.openai.com/*",
+        "*://chatgpt.com/*",
+        "*://claude.ai/*",
+        "*://gemini.google.com/*",
+        "*://aistudio.google.com/*",
+        "*://notebooklm.google.com/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": [
+    "*://chat.openai.com/*",
+    "*://chatgpt.com/*",
+    "*://claude.ai/*",
+    "*://gemini.google.com/*",
+    "*://aistudio.google.com/*",
+    "*://notebooklm.google.com/*"
+  ]
+}

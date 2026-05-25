@@ -1,0 +1,21 @@
+{
+  "name": "aiexporter",
+  "version": "1.0.0",
+  "description": "Exporta conversaciones de IAs a MD y PDF",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.5",
+    "@types/chrome": "^0.0.268",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "lucide-preact": "^0.300.0",
+    "preact": "^10.19.0"
+  }
+}
