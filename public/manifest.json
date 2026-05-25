@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "AI Exporter Hexagonal",
-  "version": "1.0.1",
-  "description": "Exporta conversaciones de ChatGPT, Claude, Gemini y NotebookLM a MD y PDF.",
+  "version": "1.0.5",
+  "description": "Exporta conversaciones de ChatGPT, Claude, Gemini y NotebookLM a MD y PDF Pro.",
   "permissions": ["storage", "activeTab", "scripting"],
   "action": {
     "default_popup": "index.html"
@@ -21,8 +21,8 @@
         "*://aistudio.google.com/*",
         "*://notebooklm.google.com/*"
       ],
-      "js": ["content.js"],
-      "css": ["content.css"],
+      "js": ["loader.js"],
+      "css": ["style.css"],
       "run_at": "document_idle"
     }
   ],
@@ -33,5 +33,11 @@
     "*://gemini.google.com/*",
     "*://aistudio.google.com/*",
     "*://notebooklm.google.com/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["content.js", "assets/*"],
+      "matches": ["<all_urls>"]
+    }
   ]
 }

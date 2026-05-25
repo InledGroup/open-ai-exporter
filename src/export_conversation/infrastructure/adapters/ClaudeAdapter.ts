@@ -14,18 +14,24 @@ export class ClaudeAdapter implements IAAdapter {
     const messages: Message[] = [];
 
     elements.forEach((el, index) => {
-      // Detección de roles basada en data-testid
       const isUser = el.querySelector('[data-testid="user-message"]') !== null;
       const role: Role = isUser ? 'user' : 'assistant';
       
-      // Intentamos capturar solo el cuerpo del mensaje, omitiendo la barra de herramientas
       const contentEl = el.querySelector('.font-claude-message, .font-user-message') || 
                         el.querySelector('.grid.gap-4') || 
                         el;
 
       const clone = contentEl.cloneNode(true) as HTMLElement;
-      // Limpiar botones de la UI (Copiar, Reintentar, etc.)
-      clone.querySelectorAll('button, [role="toolbar"], .flex.justify-end').forEach(ui => ui.remove());
+      
+      // Limpiar encabezados intrusivos tipo "Has dicho"
+      clone.querySelectorAll('h1, h2, h3, h4').forEach(h => {
+        if (h.textContent?.toLowerCase().includes('has dicho') || h.textContent?.toLowerCase().includes('you said')) {
+          h.remove();
+        }
+      });
+
+      // Limpiar botones y UI
+      clone.querySelectorAll('button, [role="toolbar"], .flex.justify-end, svg, .sr-only, .ai-exporter-checkbox').forEach(node => node.remove());
 
       messages.push({
         id: `claude-msg-${index}`,
@@ -51,13 +57,8 @@ export class ClaudeAdapter implements IAAdapter {
       checkbox.dataset.id = `claude-msg-${index}`;
       
       checkbox.style.cssText = `
-        position: absolute;
-        left: -30px;
-        top: 10px;
-        z-index: 10000;
-        width: 18px;
-        height: 18px;
-        cursor: pointer;
+        position: absolute; left: -40px; top: 15px; z-index: 10000;
+        width: 20px; height: 20px; cursor: pointer;
       `;
 
       checkbox.addEventListener('change', () => {

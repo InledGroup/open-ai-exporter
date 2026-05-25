@@ -1,4 +1,6 @@
 import TurndownService from 'turndown';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import { Message } from '../../core/domain/entities';
 
 export class ExportService {
@@ -17,19 +19,17 @@ export class ExportService {
     return md;
   }
 
-  toPdfHtml(messages: Message[], title: string): string {
+  generatePreviewHtml(messages: Message[], title: string): string {
     const messagesHtml = messages.map(msg => {
       const isUser = msg.role === 'user';
       const alignClass = isUser ? 'user-row' : 'ai-row';
       const bubbleClass = isUser ? 'user-bubble' : 'ai-bubble';
       const avatar = isUser ? '👤' : '🤖';
-      const roleLabel = isUser ? 'Tú' : 'Asistente IA';
       
       return `
         <div class="message-row ${alignClass}">
           ${!isUser ? `<div class="avatar">${avatar}</div>` : ''}
           <div class="message-wrapper">
-            <div class="role-name">${roleLabel}</div>
             <div class="bubble ${bubbleClass}">
               <div class="content">${msg.content}</div>
             </div>
@@ -40,159 +40,89 @@ export class ExportService {
     }).join('');
 
     return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>${title}</title>
-        <script>
-          window.MathJax = {
-            tex: {
-              inlineMath: [['$', '$'], ['\\(', '\\)']],
-              displayMath: [['$$', '$$'], ['\\[', '\\]']],
-              processEscapes: true
-            },
-            options: {
-              skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
-            }
-          };
-        </script>
-        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      <div id="ai-exporter-preview-container">
         <style>
-          body { 
+          #ai-exporter-preview-container {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            line-height: 1.5;
+            line-height: 1.6;
             color: #374151;
-            background-color: #f9fafb;
-            padding: 20px;
+            background-color: #f3f4f6;
+            padding: 40px;
             max-width: 900px;
             margin: auto;
+            border-radius: 12px;
           }
-          h1 {
-            text-align: center;
-            color: #111827;
-            margin-bottom: 40px;
-            font-size: 22px;
-            font-weight: 600;
-          }
-          .message-row {
-            display: flex;
-            margin-bottom: 24px;
-            gap: 12px;
-            width: 100%;
-          }
+          .preview-header { text-align: center; margin-bottom: 40px; }
+          .message-row { display: flex; margin-bottom: 32px; gap: 15px; width: 100%; }
           .user-row { justify-content: flex-end; }
           .ai-row { justify-content: flex-start; }
-          
-          .message-wrapper {
-            max-width: 80%;
-            display: flex;
-            flex-direction: column;
-          }
+          .message-wrapper { max-width: 85%; display: flex; flex-direction: column; }
           .user-row .message-wrapper { align-items: flex-end; }
           .ai-row .message-wrapper { align-items: flex-start; }
-
-          .role-name {
-            font-size: 11px;
-            font-weight: 600;
-            color: #6b7280;
-            margin-bottom: 4px;
-            margin-left: 4px;
-            margin-right: 4px;
-          }
-
-          .avatar {
-            width: 32px;
-            height: 32px;
-            background: #e5e7eb;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            flex-shrink: 0;
-            margin-top: 18px;
-          }
-
-          .bubble {
-            padding: 12px 16px;
-            border-radius: 18px;
-            font-size: 15px;
-            word-wrap: break-word;
-            position: relative;
-          }
-          .user-bubble {
-            background-color: #2563eb;
-            color: white;
-            border-bottom-right-radius: 4px;
-          }
-          .ai-bubble {
-            background-color: #ffffff;
-            color: #1f2937;
-            border: 1px solid #e5e7eb;
-            border-bottom-left-radius: 4px;
-          }
-
-          .content {
-            white-space: normal;
-          }
+          .bubble { padding: 16px 20px; border-radius: 16px; font-size: 16px; word-wrap: break-word; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+          .user-bubble { background-color: #2563eb; color: white !important; border-bottom-right-radius: 4px; }
+          .ai-bubble { background-color: #ffffff; color: #1f2937 !important; border: 1px solid #e5e7eb; border-bottom-left-radius: 4px; }
+          .avatar { width: 36px; height: 36px; background: #e5e7eb; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-top: 15px; font-size: 20px; }
           
-          /* Formato de contenido */
-          .content pre {
-            background: rgba(0,0,0,0.05);
-            padding: 12px;
-            border-radius: 8px;
-            overflow-x: auto;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            font-size: 13px;
-            margin: 10px 0;
-          }
-          .user-bubble pre { background: rgba(255,255,255,0.1); }
+          /* CONTENIDO Y FORMATO */
+          .content p { margin: 0 0 1em 0; }
+          .content pre { background: rgba(0,0,0,0.07); padding: 14px; border-radius: 10px; font-size: 14px; margin: 15px 0; overflow-x: auto; border: 1px solid rgba(0,0,0,0.1); }
+          .user-bubble pre { background: rgba(255,255,255,0.15); color: white; border: none; }
+          .content code { font-family: monospace; padding: 3px 6px; border-radius: 5px; background: rgba(0,0,0,0.07); }
           
-          .content code {
-            font-family: monospace;
-            padding: 2px 4px;
-            border-radius: 4px;
-            background: rgba(0,0,0,0.05);
-          }
-          .user-bubble code { background: rgba(255,255,255,0.2); }
-
-          .content table {
-            border-collapse: collapse;
-            width: 100%;
-            margin: 12px 0;
-          }
-          .content th, .content td {
-            border: 1px solid #e5e7eb;
-            padding: 8px;
-            text-align: left;
+          /* FIX GEMINI */
+          user-query, model-response, chat-message { 
+            display: block !important; 
+            width: 100% !important; 
+            background: transparent !important; 
+            margin: 0 !important;
+            padding: 0 !important;
           }
 
-          @media print {
-            body { background-color: #fff; padding: 0; }
-            .bubble { box-shadow: none; border: 1px solid #e5e7eb; }
-            .user-bubble { color: #000; background: #f3f4f6; }
-            .message-row { break-inside: avoid; }
-          }
+          /* OCULTAR ELEMENTOS RESIDUALES */
+          .ai-exporter-checkbox, button, .sr-only, .flex.justify-end { display: none !important; }
         </style>
-        <script>
-          window.onload = function() {
-            // Dar tiempo a MathJax para renderizar
-            setTimeout(() => {
-              window.print();
-            }, 1000);
-          };
-        </script>
-      </head>
-      <body>
-        <h1>${title}</h1>
-        ${messagesHtml}
-        <div style="text-align: center; color: #9ca3af; font-size: 10px; margin-top: 50px;">
-          Exportado con AI Exporter Hexagonal
+        <div class="preview-header">
+          <h1>${title}</h1>
         </div>
-      </body>
-      </html>
+        ${messagesHtml}
+      </div>
     `;
+  }
+
+  async exportToPdfWithCanvas(containerId: string, filename: string) {
+    const element = document.getElementById(containerId);
+    if (!element) return;
+
+    // Usar una ventana temporal o asegurar visibilidad para captura
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#f3f4f6',
+      windowWidth: element.scrollWidth,
+      windowHeight: element.scrollHeight
+    });
+
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+    let heightLeft = pdfHeight;
+    let position = 0;
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
+    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+    heightLeft -= pageHeight;
+
+    while (heightLeft >= 0) {
+      position = heightLeft - pdfHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+      heightLeft -= pageHeight;
+    }
+
+    pdf.save(filename);
   }
 
   downloadFile(content: string, filename: string, type: string) {

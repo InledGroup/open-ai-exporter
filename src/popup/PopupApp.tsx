@@ -19,10 +19,9 @@ export function PopupApp() {
         return;
       }
 
-      // Enviar mensaje con timeout manual para evitar colgarse
       chrome.tabs.sendMessage(tabId, { action: 'GET_MESSAGES' }, (response) => {
         if (chrome.runtime.lastError) {
-          setError(`Error de conexión: ${chrome.runtime.lastError.message}. Por favor, refresca la página del chat.`);
+          setError(`Error de conexión: Por favor, refresca la página del chat.`);
           setLoading(false);
           return;
         }
@@ -41,7 +40,7 @@ export function PopupApp() {
     fetchData();
   }, []);
 
-  const handleExport = (type: 'md' | 'pdf', onlySelected: boolean) => {
+  const handleExport = (type: 'md' | 'pdf_advanced', onlySelected: boolean) => {
     if (!data || data.messages.length === 0) return;
 
     let messagesToExport = data.messages;
@@ -53,26 +52,30 @@ export function PopupApp() {
       const content = exportService.toMarkdown(messagesToExport, data.title);
       exportService.downloadFile(content, `${data.title}.md`, 'text/markdown');
     } else {
-      const content = exportService.toPdfHtml(messagesToExport, data.title);
-      const win = window.open('', '_blank');
-      if (win) {
-        win.document.write(content);
-        win.document.close();
-      }
+      // Enviar mensaje al content script para abrir previsualización
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        const tabId = tabs[0]?.id;
+        if (tabId) {
+          chrome.tabs.sendMessage(tabId, { 
+            action: 'EXPORT_PDF_ADVANCED', 
+            data: { messages: messagesToExport, title: data.title }
+          });
+          window.close(); // Cerrar popup para que el usuario vea la previsualización
+        }
+      });
     }
   };
 
   if (loading) return (
     <div class="p-4 w-64 bg-white text-center">
-      <div class="animate-spin inline-block w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full mb-2"></div>
       <p>Cargando mensajes...</p>
     </div>
   );
 
   if (error) return (
     <div class="p-4 w-64 bg-white">
-      <p class="text-red-600 mb-4">{error}</p>
-      <button onClick={fetchData} class="w-full bg-gray-200 py-2 rounded">Reintentar</button>
+      <p class="text-red-600 mb-4 text-sm">{error}</p>
+      <button onClick={fetchData} class="w-full bg-gray-200 py-2 rounded text-sm">Reintentar</button>
     </div>
   );
 
@@ -82,19 +85,17 @@ export function PopupApp() {
       
       <div class="space-y-2">
         <button 
-          disabled={!data || data.messages.length === 0}
           onClick={() => handleExport('md', false)}
-          class="w-full bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+          class="w-full bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 text-sm"
         >
-          Exportar Todo (MD)
+          Exportar Todo (Markdown)
         </button>
         
         <button 
-          disabled={!data || data.messages.length === 0}
-          onClick={() => handleExport('pdf', false)}
-          class="w-full bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700 disabled:opacity-50"
+          onClick={() => handleExport('pdf_advanced', false)}
+          class="w-full bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700 text-sm"
         >
-          Exportar Todo (PDF)
+          Exportar Todo (PDF Pro)
         </button>
 
         <hr />
@@ -102,17 +103,17 @@ export function PopupApp() {
         <button 
           disabled={!data || data.selectedIds.length === 0}
           onClick={() => handleExport('md', true)}
-          class="w-full border border-blue-600 text-blue-600 px-3 py-2 rounded hover:bg-blue-50 disabled:opacity-50"
+          class="w-full border border-blue-600 text-blue-600 px-3 py-2 rounded hover:bg-blue-50 disabled:opacity-50 text-sm"
         >
-          Exportar Seleccionados ({data?.selectedIds.length || 0}) (MD)
+          Seleccionados ({data?.selectedIds.length || 0}) (MD)
         </button>
 
         <button 
           disabled={!data || data.selectedIds.length === 0}
-          onClick={() => handleExport('pdf', true)}
-          class="w-full border border-red-600 text-red-600 px-3 py-2 rounded hover:bg-red-50 disabled:opacity-50"
+          onClick={() => handleExport('pdf_advanced', true)}
+          class="w-full border border-red-600 text-red-600 px-3 py-2 rounded hover:bg-red-50 disabled:opacity-50 text-sm"
         >
-          Exportar Seleccionados ({data?.selectedIds.length || 0}) (PDF)
+          Seleccionados ({data?.selectedIds.length || 0}) (PDF Pro)
         </button>
       </div>
     </div>
