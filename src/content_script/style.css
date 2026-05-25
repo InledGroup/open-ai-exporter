@@ -1,16 +1,16 @@
+/* Estilos mínimos para los checkboxes inyectados */
 .ai-exporter-checkbox {
   appearance: checkbox !important;
+  -webkit-appearance: checkbox !important;
   width: 18px !important;
   height: 18px !important;
   cursor: pointer !important;
   accent-color: #2563eb !important;
-  margin: 5px !important;
-  z-index: 9999 !important;
+  z-index: 10000 !important;
+  margin: 0 !important;
 }
 
-/* ChatGPT specific tweaks */
-[hostname="chatgpt.com"] .ai-exporter-checkbox {
-  position: absolute;
-  left: -25px;
-  top: 10px;
+/* Evitar que estilos globales afecten a los elementos inyectados */
+.ai-exporter-checkbox:hover {
+  opacity: 1 !important;
 }

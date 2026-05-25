@@ -52,16 +52,12 @@ export function PopupApp() {
       const content = exportService.toMarkdown(messagesToExport, data.title);
       exportService.downloadFile(content, `${data.title}.md`, 'text/markdown');
     } else {
-      // Enviar mensaje al content script para abrir previsualización
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        const tabId = tabs[0]?.id;
-        if (tabId) {
-          chrome.tabs.sendMessage(tabId, { 
-            action: 'EXPORT_PDF_ADVANCED', 
-            data: { messages: messagesToExport, title: data.title }
-          });
-          window.close(); // Cerrar popup para que el usuario vea la previsualización
-        }
+      // Guardar datos en storage local y abrir nueva pestaña de la extensión
+      chrome.storage.local.set({ 
+        export_preview_data: { messages: messagesToExport, title: data.title } 
+      }, () => {
+        chrome.tabs.create({ url: chrome.runtime.getURL('preview.html') });
+        window.close();
       });
     }
   };

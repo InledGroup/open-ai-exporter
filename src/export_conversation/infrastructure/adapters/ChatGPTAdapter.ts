@@ -2,7 +2,8 @@ import { IAAdapter } from '../../../core/domain/IAAdapter';
 import { Message, Role } from '../../../core/domain/entities';
 
 export class ChatGPTAdapter implements IAAdapter {
-  private readonly MESSAGE_SELECTOR = 'main article > div.text-base > div';
+  // Selector estable: cada turno de conversación es un 'article'
+  private readonly MESSAGE_SELECTOR = 'article';
   private readonly CHECKBOX_CLASS = 'ai-exporter-checkbox';
 
   isCurrentPage(): boolean {
@@ -11,20 +12,34 @@ export class ChatGPTAdapter implements IAAdapter {
   }
 
   getMessages(): Message[] {
-    const elements = document.querySelectorAll(this.MESSAGE_SELECTOR);
+    const articles = document.querySelectorAll(this.MESSAGE_SELECTOR);
     const messages: Message[] = [];
 
-    elements.forEach((el, index) => {
-      const role = this.detectChatType(el as HTMLElement);
-      const isAssistant = role === 'chatgpt';
+    articles.forEach((el, index) => {
+      // El contenido real está en .markdown o en el div de texto base
+      const contentEl = el.querySelector('.markdown') || el.querySelector('.text-base') || el;
       
-      const contentEl = el.querySelector('.markdown') || el;
+      // Detección de rol robusta
+      const roleEl = el.querySelector('[data-message-author-role]');
+      const roleAttr = roleEl?.getAttribute('data-message-author-role');
+      
+      let role: Role = 'user';
+      if (roleAttr === 'assistant') {
+        role = 'assistant';
+      } else if (el.querySelector('.sr-only')?.textContent?.toLowerCase().includes('chatgpt') || 
+                 el.querySelector('svg.icon-sm') || 
+                 el.querySelector('.agent-turn')) {
+        role = 'assistant';
+      }
+
+      // Clonamos para limpiar la UI sin romper la página
       const clone = contentEl.cloneNode(true) as HTMLElement;
+      // Eliminamos botones de la UI (Copiar, Escuchar, etc.) y nuestro propio checkbox si se coló
       clone.querySelectorAll('button, .flex.justify-between, .sr-only, .ai-exporter-checkbox').forEach(node => node.remove());
 
       messages.push({
         id: `chatgpt-msg-${index}`,
-        role: isAssistant ? 'assistant' : 'user',
+        role,
         content: clone.innerHTML
       });
     });
@@ -32,45 +47,45 @@ export class ChatGPTAdapter implements IAAdapter {
     return messages;
   }
 
-  private detectChatType(e: HTMLElement): string {
-    let n = e.parentElement;
-    for (let r = 0; r < 5 && n; r++) {
-      if (n.tagName === "ARTICLE") {
-        const i = n.querySelectorAll(".sr-only");
-        for (let o = 0; o < i.length; o++) {
-          if ((i[o].textContent?.toLowerCase() || "").includes("chatgpt")) {
-            return "chatgpt";
-          }
-        }
-        break;
-      }
-      n = n.parentElement;
-    }
-    return "prompt";
-  }
-
   injectCheckboxes(onSelectionChange: (selectedIds: string[]) => void): void {
-    const elements = document.querySelectorAll(this.MESSAGE_SELECTOR);
-    elements.forEach((el, index) => {
+    const articles = document.querySelectorAll(this.MESSAGE_SELECTOR);
+    articles.forEach((el, index) => {
+      // Evitamos inyectar si ya existe o si es un article vacío/layout
       if (el.querySelector(`.${this.CHECKBOX_CLASS}`)) return;
 
       const container = el as HTMLElement;
-      container.style.position = 'relative';
+      
+      // Intentamos inyectar en un lugar que no rompa el flexbox original
+      // Buscamos el div que envuelve el avatar o el contenido
+      const target = el.querySelector('.flex.flex-1') || el;
 
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.className = this.CHECKBOX_CLASS;
       checkbox.dataset.id = `chatgpt-msg-${index}`;
+      
+      // Estilos mínimos y aislados para no romper el CSS de ChatGPT
       checkbox.style.cssText = `
-        position: absolute; left: -35px; top: 5px; z-index: 1000;
-        width: 20px; height: 20px; cursor: pointer;
+        margin-right: 10px;
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        z-index: 10;
+        flex-shrink: 0;
       `;
 
       checkbox.addEventListener('change', () => {
         onSelectionChange(this.getSelectedMessageIds());
       });
 
-      container.prepend(checkbox);
+      // Insertamos al principio del contenedor interno
+      if (target !== el) {
+        target.prepend(checkbox);
+      } else {
+        // Fallback si no encontramos el flex-1
+        container.style.display = 'flex';
+        container.prepend(checkbox);
+      }
     });
   }
 
