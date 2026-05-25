@@ -14,19 +14,23 @@ export class ClaudeAdapter implements IAAdapter {
     const messages: Message[] = [];
 
     elements.forEach((el, index) => {
-      // Lógica de detección de roles de Claude extraída de sourcecode
-      // Busca [data-testid="user-message"] dentro del contenedor
+      // Detección de roles basada en data-testid
       const isUser = el.querySelector('[data-testid="user-message"]') !== null;
       const role: Role = isUser ? 'user' : 'assistant';
       
-      // Capturamos el contenido. Claude a menudo tiene el texto dentro de .font-claude-message o similar
-      // pero el contenedor [data-test-render-count] es el que tiene el bloque completo.
-      const contentEl = el.querySelector('.font-claude-message, .font-user-message') || el;
+      // Intentamos capturar solo el cuerpo del mensaje, omitiendo la barra de herramientas
+      const contentEl = el.querySelector('.font-claude-message, .font-user-message') || 
+                        el.querySelector('.grid.gap-4') || 
+                        el;
+
+      const clone = contentEl.cloneNode(true) as HTMLElement;
+      // Limpiar botones de la UI (Copiar, Reintentar, etc.)
+      clone.querySelectorAll('button, [role="toolbar"], .flex.justify-end').forEach(ui => ui.remove());
 
       messages.push({
         id: `claude-msg-${index}`,
         role,
-        content: (contentEl as HTMLElement).innerHTML
+        content: clone.innerHTML
       });
     });
 
@@ -70,7 +74,6 @@ export class ClaudeAdapter implements IAAdapter {
   }
 
   getConversationTitle(): string {
-    // Intenta sacar el título del chat del sidebar o la URL
     return document.title || 'Claude Conversation';
   }
 }
