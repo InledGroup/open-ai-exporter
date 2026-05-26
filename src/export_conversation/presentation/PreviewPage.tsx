@@ -13,6 +13,10 @@ import {
   Square,
   ClipboardCheck,
   ClipboardList,
+  FileJson,
+  FileType,
+  FileCode,
+  FileOutput,
 } from "lucide-preact";
 
 export function PreviewPage() {
@@ -39,6 +43,11 @@ export function PreviewPage() {
     });
   }, []);
 
+  const getMessagesToExport = () => {
+    if (!data) return [];
+    return data.messages.filter((m) => selectedIds.has(m.id));
+  };
+
   const handleDownloadPdf = async () => {
     if (!data) return;
     setStatus("generating");
@@ -49,13 +58,6 @@ export function PreviewPage() {
 
     setTimeout(async () => {
       try {
-        const messagesToExport = data.messages.filter((m) =>
-          selectedIds.has(m.id),
-        );
-        // We'll pass the filtered messages if we were to re-render,
-        // but html2canvas captures what's on screen.
-        // So we actually need to ONLY show selected messages during capture.
-
         await exportService.exportToPdfWithCanvas(
           "preview-content",
           `${data.title}.pdf`,
@@ -74,9 +76,43 @@ export function PreviewPage() {
 
   const handleDownloadMarkdown = () => {
     if (!data) return;
-    const messagesToExport = data.messages.filter((m) => selectedIds.has(m.id));
+    const messagesToExport = getMessagesToExport();
     const md = exportService.toMarkdown(messagesToExport, data.title);
     exportService.downloadFile(md, `${data.title}.md`, "text/markdown");
+  };
+
+  const handleDownloadJSON = () => {
+    if (!data) return;
+    const messagesToExport = getMessagesToExport();
+    const json = exportService.toJSON(messagesToExport);
+    exportService.downloadFile(json, `${data.title}.json`, "application/json");
+  };
+
+  const handleDownloadTXT = () => {
+    if (!data) return;
+    const messagesToExport = getMessagesToExport();
+    const txt = exportService.toText(messagesToExport, data.title);
+    exportService.downloadFile(txt, `${data.title}.txt`, "text/plain");
+  };
+
+  const handleDownloadWord = async () => {
+    if (!data) return;
+    setStatus("generating");
+    try {
+      const messagesToExport = getMessagesToExport();
+      const blob = await exportService.toWord(messagesToExport, data.title);
+      exportService.downloadFile(
+        blob,
+        `${data.title}.docx`,
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      );
+      setStatus("done");
+      setTimeout(() => setStatus("idle"), 3000);
+    } catch (err) {
+      console.error(err);
+      setStatus("idle");
+      alert("Error generating Word document");
+    }
   };
 
   const toggleSelection = (id: string) => {
@@ -147,7 +183,7 @@ export function PreviewPage() {
           <div className="divider" />
 
           <button
-            onClick={handleDownloadPdf}
+            onClick={handleDownloadWord}
             disabled={status === "generating"}
             className="btn-primary"
           >
@@ -156,12 +192,35 @@ export function PreviewPage() {
             ) : (
               <FileText size={18} />
             )}
-            {status === "generating" ? "Exportando..." : "PDF"}
+            {status === "generating" ? "..." : "Word"}
+          </button>
+
+          <button
+            onClick={handleDownloadPdf}
+            disabled={status === "generating"}
+            className="btn-primary"
+          >
+            {status === "generating" ? (
+              <div class="spinner"></div>
+            ) : (
+              <FileOutput size={18} />
+            )}
+            {status === "generating" ? "..." : "PDF"}
           </button>
 
           <button onClick={handleDownloadMarkdown} className="btn-primary">
-            <Download size={18} />
-            Markdown
+            <FileCode size={18} />
+            MD
+          </button>
+
+          <button onClick={handleDownloadJSON} className="btn-primary">
+            <FileJson size={18} />
+            JSON
+          </button>
+
+          <button onClick={handleDownloadTXT} className="btn-primary">
+            <FileType size={18} />
+            TXT
           </button>
 
           <button onClick={() => window.close()} className="btn-close">

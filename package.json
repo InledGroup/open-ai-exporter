@@ -1,7 +1,7 @@
 {
   "name": "aiexporter",
   "version": "1.0.0",
-  "description": "Exporta conversaciones de IAs a MD y PDF",
+  "description": "Exporta conversaciones de IAs a MD, PDF, Word, JSON y TXT",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -17,6 +17,8 @@
     "vite": "^5.0.0"
   },
   "dependencies": {
+    "docx": "^9.7.0",
+    "html-docx-js-typescript": "^0.1.5",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "lucide-preact": "^0.300.0",

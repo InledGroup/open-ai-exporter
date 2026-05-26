@@ -3,12 +3,17 @@ import { ExportService } from "../export_conversation/application/ExportService"
 import { Message } from "../core/domain/entities";
 import {
   FileText,
-  Download,
   CheckSquare,
   MousePointer2,
   RotateCcw,
   CheckCircle2,
+  FileJson,
+  FileType,
+  FileCode,
+  FileOutput,
 } from "lucide-preact";
+
+type ExportType = "md" | "pdf_advanced" | "word" | "json" | "txt";
 
 export function PopupApp() {
   const [data, setData] = useState<{
@@ -19,6 +24,7 @@ export function PopupApp() {
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<ExportType | null>(null);
   const exportService = new ExportService();
 
   const fetchData = () => {
@@ -103,7 +109,7 @@ export function PopupApp() {
     });
   };
 
-  const handleExport = (type: "md" | "pdf_advanced", onlySelected: boolean) => {
+  const handleExport = async (type: ExportType, onlySelected: boolean) => {
     if (!data || data.messages.length === 0) return;
 
     let messagesToExport = data.messages;
@@ -113,10 +119,7 @@ export function PopupApp() {
       );
     }
 
-    if (type === "md") {
-      const content = exportService.toMarkdown(messagesToExport, data.title);
-      exportService.downloadFile(content, `${data.title}.md`, "text/markdown");
-    } else {
+    if (type === "pdf_advanced") {
       chrome.storage.local.set(
         {
           export_preview_data: {
@@ -129,6 +132,33 @@ export function PopupApp() {
           window.close();
         },
       );
+      return;
+    }
+
+    setExporting(type);
+    try {
+      if (type === "md") {
+        const content = exportService.toMarkdown(messagesToExport, data.title);
+        exportService.downloadFile(content, `${data.title}.md`, "text/markdown");
+      } else if (type === "json") {
+        const content = exportService.toJSON(messagesToExport);
+        exportService.downloadFile(content, `${data.title}.json`, "application/json");
+      } else if (type === "txt") {
+        const content = exportService.toText(messagesToExport, data.title);
+        exportService.downloadFile(content, `${data.title}.txt`, "text/plain");
+      } else if (type === "word") {
+        const blob = await exportService.toWord(messagesToExport, data.title);
+        exportService.downloadFile(
+          blob,
+          `${data.title}.docx`,
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        );
+      }
+      setTimeout(() => setExporting(null), 1500);
+    } catch (err) {
+      console.error(err);
+      setExporting(null);
+      alert("Error al exportar");
     }
   };
 
@@ -193,18 +223,47 @@ export function PopupApp() {
         <div className="export-grid">
           <button
             onClick={() => handleExport("md", false)}
-            className="export-card group"
+            disabled={!!exporting}
+            className="export-card"
           >
-            <Download size={20} className="card-icon" />
-            <span className="card-label">TODO (.MD)</span>
+            <FileCode size={18} className="card-icon" />
+            <span className="card-label">MD</span>
           </button>
 
           <button
             onClick={() => handleExport("pdf_advanced", false)}
-            className="export-card group"
+            disabled={!!exporting}
+            className="export-card"
           >
-            <FileText size={20} className="card-icon" />
-            <span className="card-label">TODO (.PDF)</span>
+            <FileOutput size={18} className="card-icon" />
+            <span className="card-label">PDF</span>
+          </button>
+
+          <button
+            onClick={() => handleExport("word", false)}
+            disabled={!!exporting}
+            className="export-card"
+          >
+            {exporting === "word" ? <div className="spinner-small" /> : <FileText size={18} className="card-icon" />}
+            <span className="card-label">WORD</span>
+          </button>
+
+          <button
+            onClick={() => handleExport("json", false)}
+            disabled={!!exporting}
+            className="export-card"
+          >
+            <FileJson size={18} className="card-icon" />
+            <span className="card-label">JSON</span>
+          </button>
+
+          <button
+            onClick={() => handleExport("txt", false)}
+            disabled={!!exporting}
+            className="export-card"
+          >
+            <FileType size={18} className="card-icon" />
+            <span className="card-label">TXT</span>
           </button>
         </div>
 
@@ -214,20 +273,27 @@ export function PopupApp() {
             <div className="selection-summary">
               Seleccionados ({data?.selectedIds.length})
             </div>
-            <div className="btn-group">
+            <div className="export-grid mini">
               <button
-                disabled={!data || data.selectedIds.length === 0}
+                disabled={!data || data.selectedIds.length === 0 || !!exporting}
                 onClick={() => handleExport("md", true)}
                 className="btn-action primary"
               >
-                <Download size={14} /> MD
+                <FileCode size={12} /> MD
               </button>
               <button
-                disabled={!data || data.selectedIds.length === 0}
+                disabled={!data || data.selectedIds.length === 0 || !!exporting}
+                onClick={() => handleExport("word", true)}
+                className="btn-action primary"
+              >
+                {exporting === "word" ? <div className="spinner-small white" /> : <FileText size={12} />} WORD
+              </button>
+              <button
+                disabled={!data || data.selectedIds.length === 0 || !!exporting}
                 onClick={() => handleExport("pdf_advanced", true)}
                 className="btn-action primary"
               >
-                <FileText size={14} /> PDF PRO
+                <FileOutput size={12} /> PDF
               </button>
             </div>
           </div>
@@ -235,7 +301,7 @@ export function PopupApp() {
       </div>
 
       <footer className="popup-footer">
-        <p>AI Exporter Pro • </p>
+        <p>AI Exporter Pro • Inled</p>
       </footer>
 
       <style>{`
@@ -249,7 +315,7 @@ export function PopupApp() {
         }
 
         .popup-container {
-          width: 280px;
+          width: 300px;
           padding: 16px;
           background: white;
           font-family: 'Inter', -apple-system, sans-serif;
@@ -343,28 +409,37 @@ export function PopupApp() {
 
         .export-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 8px;
+        }
+
+        .export-grid.mini {
+          grid-template-columns: repeat(3, 1fr);
         }
 
         .export-card {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 8px;
+          gap: 6px;
           background: #f9fafb;
           border: 1px solid #f3f4f6;
-          padding: 12px;
-          border-radius: 12px;
+          padding: 10px 4px;
+          border-radius: 10px;
           cursor: pointer;
           transition: all 0.2s;
         }
 
-        .export-card:hover {
+        .export-card:hover:not(:disabled) {
           background: white;
           border-color: var(--primary);
           box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
           transform: translateY(-1px);
+        }
+
+        .export-card:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
         }
 
         .card-icon {
@@ -375,7 +450,7 @@ export function PopupApp() {
         .export-card:hover .card-icon { color: var(--primary); }
 
         .card-label {
-          font-size: 10px;
+          font-size: 9px;
           font-weight: 800;
           color: var(--text-muted);
         }
@@ -394,21 +469,15 @@ export function PopupApp() {
           text-transform: uppercase;
         }
 
-        .btn-group {
-          display: flex;
-          gap: 8px;
-        }
-
         .btn-action {
-          flex: 1;
-          padding: 8px;
+          padding: 8px 4px;
           border-radius: 8px;
           font-weight: 700;
-          font-size: 11px;
+          font-size: 10px;
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 6px;
+          gap: 4px;
           cursor: pointer;
           border: none;
           transition: all 0.2s;
@@ -419,7 +488,7 @@ export function PopupApp() {
           color: white;
         }
 
-        .primary:hover {
+        .primary:hover:not(:disabled) {
           background: var(--primary-hover);
           box-shadow: 0 4px 12px rgba(58, 194, 0, 0.25);
         }
@@ -427,7 +496,6 @@ export function PopupApp() {
         .primary:disabled {
           opacity: 0.5;
           cursor: not-allowed;
-          box-shadow: none;
         }
 
         .btn-retry {
@@ -470,6 +538,20 @@ export function PopupApp() {
           border-top-color: var(--primary);
           border-radius: 50%;
           animation: spin 0.8s linear infinite;
+        }
+
+        .spinner-small {
+          width: 14px;
+          height: 14px;
+          border: 2px solid #f3f4f6;
+          border-top-color: var(--primary);
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+
+        .spinner-small.white {
+          border-color: rgba(255,255,255,0.3);
+          border-top-color: white;
         }
 
         @keyframes spin { to { transform: rotate(360deg); } }
