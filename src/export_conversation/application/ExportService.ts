@@ -9,7 +9,10 @@ import {
   HeadingLevel, 
   AlignmentType,
   BorderStyle,
-  VerticalAlign
+  Table,
+  TableRow,
+  TableCell,
+  WidthType
 } from 'docx';
 import { Message } from '../../core/domain/entities';
 
@@ -45,7 +48,7 @@ export class ExportService {
   }
 
   async toWord(messages: Message[], title: string): Promise<Blob> {
-    const children: any[] = [
+    const docChildren: any[] = [
       new Paragraph({
         text: title,
         heading: HeadingLevel.HEADING_1,
@@ -58,72 +61,160 @@ export class ExportService {
       const isUser = msg.role === 'user';
       const roleName = isUser ? 'Tú' : 'AI Assistant';
       const roleColor = isUser ? '2563eb' : '3ac200';
+      const bgColor = isUser ? 'F9FAFB' : 'F0FDF4'; 
+      const borderColor = isUser ? 'E5E7EB' : 'DCFCE7';
 
-      // Role header
-      children.push(
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: roleName,
-              bold: true,
-              color: roleColor,
-              size: 28,
-            }),
-          ],
-          spacing: { before: 400, after: 200 },
-          border: {
-            bottom: {
-              color: 'E5E7EB',
-              space: 1,
-              style: BorderStyle.SINGLE,
-              size: 1,
-            },
-          },
-        })
-      );
-
-      // Simple HTML to docx conversion
-      // We'll split by paragraphs/lines and do some basic text formatting
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = msg.content;
       
-      const nodes = Array.from(tempDiv.childNodes);
+      const contentParagraphs: Paragraph[] = [];
       
-      nodes.forEach(node => {
-        if (node.nodeType === Node.TEXT_NODE) {
-          const text = node.textContent?.trim();
-          if (text) {
-            children.push(new Paragraph({
-              children: [new TextRun({ text, size: 24 })],
-              spacing: { after: 200 }
-            }));
-          }
-        } else if (node.nodeType === Node.ELEMENT_NODE) {
-          const el = node as HTMLElement;
-          const text = el.innerText.trim();
-          if (text) {
-            const isCode = el.tagName === 'PRE' || el.tagName === 'CODE';
-            children.push(new Paragraph({
-              children: [
-                new TextRun({ 
-                  text, 
+      const processNodes = (nodes: NodeList, styles: any = {}): any[] => {
+        let results: any[] = [];
+        nodes.forEach(node => {
+          if (node.nodeType === Node.TEXT_NODE) {
+            const text = node.textContent || '';
+            if (text.trim()) {
+              if (text.includes('$')) {
+                const parts = text.split(/(\$\$?.*?\$\$?)/g);
+                parts.forEach(part => {
+                  if (!part) return;
+                  const isMath = part.startsWith('$');
+                  results.push(new TextRun({
+                    text: part,
+                    size: 24,
+                    italics: isMath,
+                    font: isMath ? 'Cambria Math' : undefined,
+                    ...styles
+                  }));
+                });
+              } else {
+                results.push(new TextRun({
+                  text,
                   size: 24,
-                  font: isCode ? 'Courier New' : undefined,
-                  shading: isCode ? { fill: 'F3F4F6' } : undefined
-                })
-              ],
-              spacing: { after: 200 },
-              indent: el.tagName === 'BLOCKQUOTE' ? { left: 720 } : undefined
-            }));
+                  ...styles
+                }));
+              }
+            }
+          } else if (node.nodeType === Node.ELEMENT_NODE) {
+            const el = node as HTMLElement;
+            const newStyles = { ...styles };
+            
+            if (el.classList.contains('katex-mathml') || el.tagName === 'ANNOTATION') return;
+            if (el.classList.contains('katex-html')) {
+              results.push(...processNodes(el.childNodes, { ...newStyles, italics: true, font: 'Cambria Math' }));
+              return;
+            }
+
+            if (['B', 'STRONG'].includes(el.tagName)) newStyles.bold = true;
+            if (['I', 'EM'].includes(el.tagName)) newStyles.italics = true;
+            if (['CODE'].includes(el.tagName)) {
+              newStyles.font = 'Courier New';
+              newStyles.shading = { fill: 'F3F4F6' };
+              newStyles.size = 22;
+            }
+
+            if (['P', 'DIV', 'SECTION', 'ARTICLE', 'BLOCKQUOTE', 'PRE', 'UL', 'OL'].includes(el.tagName)) {
+              // If there are current pending inline results, wrap them
+              if (results.length > 0) {
+                contentParagraphs.push(new Paragraph({ children: results, spacing: { after: 120 } }));
+                results = [];
+              }
+
+              if (el.tagName === 'PRE') {
+                contentParagraphs.push(new Paragraph({
+                  children: [new TextRun({ text: el.innerText.trim(), font: 'Courier New', size: 20 })],
+                  spacing: { before: 120, after: 120 },
+                  shading: { fill: 'F8FAFC' },
+                  border: {
+                    top: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
+                    bottom: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
+                    left: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
+                    right: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
+                  }
+                }));
+              } else if (['UL', 'OL'].includes(el.tagName)) {
+                el.querySelectorAll('li').forEach(li => {
+                  const liInline = processNodes(li.childNodes, newStyles);
+                  if (liInline.length > 0) {
+                    contentParagraphs.push(new Paragraph({
+                      children: liInline,
+                      bullet: { level: 0 },
+                      spacing: { after: 80 },
+                    }));
+                  }
+                });
+              } else {
+                const innerInline = processNodes(el.childNodes, newStyles);
+                if (innerInline.length > 0) {
+                  contentParagraphs.push(new Paragraph({ 
+                    children: innerInline, 
+                    spacing: { after: 120 },
+                    indent: el.tagName === 'BLOCKQUOTE' ? { left: 400 } : undefined,
+                    border: el.tagName === 'BLOCKQUOTE' ? { 
+                      left: { style: BorderStyle.SINGLE, size: 20, color: 'D1D5DB', space: 10 } 
+                    } : undefined
+                  }));
+                }
+              }
+            } else if (el.tagName === 'BR') {
+              results.push(new TextRun({ break: 1 }));
+            } else {
+              results.push(...processNodes(el.childNodes, newStyles));
+            }
           }
-        }
-      });
+        });
+        return results;
+      };
+
+      const finalInline = processNodes(tempDiv.childNodes);
+      if (finalInline.length > 0) {
+        contentParagraphs.push(new Paragraph({ children: finalInline, spacing: { after: 120 } }));
+      }
+
+      // Add the message bubble as a Table
+      docChildren.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: [
+          new TableRow({
+            children: [
+              new TableCell({
+                shading: { fill: bgColor },
+                borders: {
+                  top: { style: BorderStyle.SINGLE, size: 1, color: borderColor },
+                  bottom: { style: BorderStyle.SINGLE, size: 1, color: borderColor },
+                  left: { style: BorderStyle.SINGLE, size: 1, color: borderColor },
+                  right: { style: BorderStyle.SINGLE, size: 1, color: borderColor },
+                },
+                margins: { top: 200, bottom: 200, left: 200, right: 200 },
+                children: [
+                  new Paragraph({
+                    children: [
+                      new TextRun({
+                        text: roleName,
+                        bold: true,
+                        color: roleColor,
+                        size: 26,
+                      }),
+                    ],
+                    spacing: { after: 150 },
+                  }),
+                  ...contentParagraphs
+                ],
+              }),
+            ],
+          }),
+        ],
+      }));
+
+      // Add a spacer between bubbles
+      docChildren.push(new Paragraph({ text: '', spacing: { before: 200 } }));
     });
 
     const doc = new Document({
       sections: [{
         properties: {},
-        children: children,
+        children: docChildren,
       }],
     });
 
