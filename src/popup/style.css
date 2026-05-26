@@ -24,14 +24,14 @@ button {
   border: 1px solid transparent;
 }
 
-.bg-blue-600 { background-color: #2563eb; color: white; }
-.bg-blue-600:hover { background-color: #1d4ed8; }
+.bg-blue-600 { background-color: #3ac200; color: white; }
+.bg-blue-600:hover { background-color: #32a800; }
 
 .bg-red-600 { background-color: #dc2626; color: white; }
 .bg-red-600:hover { background-color: #b91c1c; }
 
-.border-blue-600 { border-color: #2563eb; color: #2563eb; background: white; }
-.border-blue-600:hover { background-color: #eff6ff; }
+.border-blue-600 { border-color: #3ac200; color: #3ac200; background: white; }
+.border-blue-600:hover { background-color: #ecfdf5; }
 
 .border-red-600 { border-color: #dc2626; color: #dc2626; background: white; }
 .border-red-600:hover { background-color: #fef2f2; }

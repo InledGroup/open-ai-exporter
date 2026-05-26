@@ -10,10 +10,10 @@
   width: 20px !important;
   height: 20px !important;
   cursor: pointer !important;
-  accent-color: #2563eb !important;
+  accent-color: #3ac200 !important;
   z-index: 999999 !important;
   margin: 0 !important;
-  border: 2px solid #3b82f6 !important;
+  border: 2px solid #3ac200 !important;
   border-radius: 4px !important;
   background-color: #fff !important;
   box-shadow: 0 0 5px rgba(0,0,0,0.2) !important;
@@ -27,5 +27,5 @@
 
 .ai-exporter-checkbox:checked {
   opacity: 1 !important;
-  filter: drop-shadow(0 0 2px #2563eb) !important;
+  filter: drop-shadow(0 0 2px #3ac200) !important;
 }

@@ -3,6 +3,11 @@
   "name": "AI Exporter Hexagonal",
   "version": "1.0.5",
   "description": "Exporta conversaciones de ChatGPT, Claude, Gemini y NotebookLM a MD y PDF Pro.",
+  "icons": {
+    "16": "aiexporter.png",
+    "48": "aiexporter.png",
+    "128": "aiexporter.png"
+  },
   "permissions": ["storage", "activeTab", "scripting"],
   "action": {
     "default_popup": "index.html"
