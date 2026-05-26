@@ -2,8 +2,8 @@ import { IAAdapter } from '../../../core/domain/IAAdapter';
 import { Message, Role } from '../../../core/domain/entities';
 
 export class ChatGPTAdapter implements IAAdapter {
-  // Selector estable: cada turno de conversación es un 'article'
-  private readonly MESSAGE_SELECTOR = 'article';
+  // Absolute first selector that worked (from Turn 11)
+  private readonly MESSAGE_SELECTOR = 'main article > div.text-base > div';
   private readonly CHECKBOX_CLASS = 'ai-exporter-checkbox';
 
   isCurrentPage(): boolean {
@@ -12,30 +12,16 @@ export class ChatGPTAdapter implements IAAdapter {
   }
 
   getMessages(): Message[] {
-    const articles = document.querySelectorAll(this.MESSAGE_SELECTOR);
+    const elements = document.querySelectorAll(this.MESSAGE_SELECTOR);
     const messages: Message[] = [];
 
-    articles.forEach((el, index) => {
-      // El contenido real está en .markdown o en el div de texto base
-      const contentEl = el.querySelector('.markdown') || el.querySelector('.text-base') || el;
+    elements.forEach((el, index) => {
+      const role = this.detectRole(el as HTMLElement);
       
-      // Detección de rol robusta
-      const roleEl = el.querySelector('[data-message-author-role]');
-      const roleAttr = roleEl?.getAttribute('data-message-author-role');
-      
-      let role: Role = 'user';
-      if (roleAttr === 'assistant') {
-        role = 'assistant';
-      } else if (el.querySelector('.sr-only')?.textContent?.toLowerCase().includes('chatgpt') || 
-                 el.querySelector('svg.icon-sm') || 
-                 el.querySelector('.agent-turn')) {
-        role = 'assistant';
-      }
-
-      // Clonamos para limpiar la UI sin romper la página
-      const clone = contentEl.cloneNode(true) as HTMLElement;
-      // Eliminamos botones de la UI (Copiar, Escuchar, etc.) y nuestro propio checkbox si se coló
-      clone.querySelectorAll('button, .flex.justify-between, .sr-only, .ai-exporter-checkbox').forEach(node => node.remove());
+      // Use innerHTML to preserve bold, italics, code, etc.
+      const clone = el.cloneNode(true) as HTMLElement;
+      // Clean up UI buttons and extra labels
+      clone.querySelectorAll('button, .sr-only, .ai-exporter-checkbox').forEach(node => node.remove());
 
       messages.push({
         id: `chatgpt-msg-${index}`,
@@ -47,45 +33,55 @@ export class ChatGPTAdapter implements IAAdapter {
     return messages;
   }
 
+  private detectRole(element: HTMLElement): Role {
+    let parent = element.parentElement;
+    for (let i = 0; i < 6 && parent; i++) {
+      if (parent.tagName === 'ARTICLE') {
+        const srOnly = parent.querySelectorAll('.sr-only');
+        for (let j = 0; j < srOnly.length; j++) {
+          if ((srOnly[j].textContent?.toLowerCase() || '').includes('chatgpt')) {
+            return 'assistant';
+          }
+        }
+        // Fallback for role attribute
+        if (parent.querySelector('[data-message-author-role="assistant"]')) return 'assistant';
+        break;
+      }
+      parent = parent.parentElement;
+    }
+    return 'user';
+  }
+
   injectCheckboxes(onSelectionChange: (selectedIds: string[]) => void): void {
-    const articles = document.querySelectorAll(this.MESSAGE_SELECTOR);
-    articles.forEach((el, index) => {
-      // Evitamos inyectar si ya existe o si es un article vacío/layout
+    const elements = document.querySelectorAll(this.MESSAGE_SELECTOR);
+    elements.forEach((el, index) => {
       if (el.querySelector(`.${this.CHECKBOX_CLASS}`)) return;
 
       const container = el as HTMLElement;
+      // We don't change container style to avoid breaking layout
       
-      // Intentamos inyectar en un lugar que no rompa el flexbox original
-      // Buscamos el div que envuelve el avatar o el contenido
-      const target = el.querySelector('.flex.flex-1') || el;
-
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.className = this.CHECKBOX_CLASS;
       checkbox.dataset.id = `chatgpt-msg-${index}`;
       
-      // Estilos mínimos y aislados para no romper el CSS de ChatGPT
+      // Minimal inline styles to ensure visibility without breaking anything
       checkbox.style.cssText = `
-        margin-right: 10px;
+        float: left;
+        margin-right: 15px;
+        margin-top: 5px;
         width: 18px;
         height: 18px;
         cursor: pointer;
-        z-index: 10;
-        flex-shrink: 0;
+        z-index: 999;
+        position: relative;
       `;
 
       checkbox.addEventListener('change', () => {
         onSelectionChange(this.getSelectedMessageIds());
       });
 
-      // Insertamos al principio del contenedor interno
-      if (target !== el) {
-        target.prepend(checkbox);
-      } else {
-        // Fallback si no encontramos el flex-1
-        container.style.display = 'flex';
-        container.prepend(checkbox);
-      }
+      container.prepend(checkbox);
     });
   }
 
@@ -95,7 +91,6 @@ export class ChatGPTAdapter implements IAAdapter {
   }
 
   getConversationTitle(): string {
-    const titleEl = document.querySelector('[data-active="true"]') || document.querySelector('h1');
-    return titleEl?.textContent?.trim() || document.title || 'ChatGPT Conversation';
+    return document.title || 'ChatGPT Conversation';
   }
 }

@@ -12,7 +12,7 @@ export class ExportService {
   toMarkdown(messages: Message[], title: string): string {
     let md = `# ${title}\n\n`;
     messages.forEach(msg => {
-      const roleName = msg.role === 'user' ? '**Usuario**' : '**IA**';
+      const roleName = msg.role === 'user' ? '**You**' : '**AI Assistant**';
       const contentMd = this.turndown.turndown(msg.content);
       md += `### ${roleName}\n\n${contentMd}\n\n---\n\n`;
     });
@@ -25,7 +25,7 @@ export class ExportService {
       const alignClass = isUser ? 'user-row' : 'ai-row';
       const bubbleClass = isUser ? 'user-bubble' : 'ai-bubble';
       const avatar = isUser ? '👤' : '🤖';
-      const roleLabel = isUser ? 'Tú' : 'Asistente IA';
+      const roleLabel = isUser ? 'You' : 'AI Assistant';
       
       return `
         <div class="message-row ${alignClass}">
@@ -61,18 +61,18 @@ export class ExportService {
           #ai-exporter-preview-container .message-wrapper { max-width: 85%; display: flex; flex-direction: column; }
           #ai-exporter-preview-container .user-row .message-wrapper { align-items: flex-end; }
           #ai-exporter-preview-container .ai-row .message-wrapper { align-items: flex-start; }
-          #ai-exporter-preview-container .bubble { padding: 16px 20px; border-radius: 16px; font-size: 16px; word-wrap: break-word; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+          #ai-exporter-preview-container .bubble { padding: 16px 20px; border-radius: 16px; font-size: 15px; word-wrap: break-word; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
           #ai-exporter-preview-container .user-bubble { background-color: #2563eb; color: white !important; border-bottom-right-radius: 4px; }
           #ai-exporter-preview-container .ai-bubble { background-color: #ffffff; color: #1f2937 !important; border: 1px solid #e5e7eb; border-bottom-left-radius: 4px; }
           #ai-exporter-preview-container .avatar { width: 36px; height: 36px; background: #e5e7eb; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-top: 15px; font-size: 20px; }
           
-          /* CONTENIDO Y FORMATO */
+          /* CONTENT FORMATTING */
           #ai-exporter-preview-container .content p { margin: 0 0 1em 0; }
           #ai-exporter-preview-container .content pre { background: rgba(0,0,0,0.07); padding: 14px; border-radius: 10px; font-size: 14px; margin: 15px 0; overflow-x: auto; border: 1px solid rgba(0,0,0,0.1); }
           #ai-exporter-preview-container .user-bubble pre { background: rgba(255,255,255,0.15); color: white; border: none; }
           #ai-exporter-preview-container .content code { font-family: monospace; padding: 3px 6px; border-radius: 5px; background: rgba(0,0,0,0.07); }
           
-          /* FIX GEMINI Y OTROS TAGS */
+          /* GEMINI AND CUSTOM TAG FIX */
           #ai-exporter-preview-container user-query, 
           #ai-exporter-preview-container model-response, 
           #ai-exporter-preview-container chat-message { 
@@ -81,20 +81,23 @@ export class ExportService {
             background: transparent !important; 
             margin: 0 !important;
             padding: 0 !important;
+            border: none !important;
           }
 
-          /* OCULTAR ELEMENTOS RESIDUALES DENTRO DEL CONTENEDOR */
+          /* HIDE RESIDUALS */
           #ai-exporter-preview-container .ai-exporter-checkbox, 
           #ai-exporter-preview-container button, 
-          #ai-exporter-preview-container .sr-only, 
-          #ai-exporter-preview-container .flex.justify-end { 
+          #ai-exporter-preview-container .sr-only { 
             display: none !important; 
           }
         </style>
         <div class="preview-header">
-          <h1>${title}</h1>
+          <h1 style="margin: 0; font-size: 24px; font-weight: 700;">${title}</h1>
         </div>
         ${messagesHtml}
+        <div style="text-align: center; color: #9ca3af; font-size: 11px; margin-top: 60px; padding-bottom: 20px;">
+          Exported with AI Exporter Hexagonal
+        </div>
       </div>
     `;
   }

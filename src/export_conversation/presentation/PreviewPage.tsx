@@ -19,7 +19,6 @@ export function PreviewPage() {
   const handleDownload = async () => {
     if (!data) return;
     setStatus('generating');
-    // Pequeño delay para permitir que el spinner se renderice
     setTimeout(async () => {
       try {
         await exportService.exportToPdfWithCanvas('preview-content', `${data.title}.pdf`);
@@ -27,24 +26,26 @@ export function PreviewPage() {
       } catch (err) {
         console.error(err);
         setStatus('idle');
-        alert('Error al generar el PDF');
+        alert('Error generating PDF');
       }
     }, 100);
   };
 
-  if (!data) return <div style="padding: 50px; text-align: center;">Cargando previsualización...</div>;
+  if (!data) return <div style="padding: 50px; text-align: center; font-family: sans-serif;">Loading Pro Preview...</div>;
 
   return (
-    <div style="display: flex; flex-direction: column; min-height: 100vh; background: #f3f4f6;">
+    <div style="display: flex; flex-direction: column; min-height: 100vh; background: #f3f4f6; font-family: sans-serif;">
       <div style="background: white; padding: 10px 40px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-        <h2 style="margin:0; font-size: 18px; color: #111827; font-family: sans-serif;">Previsualización Pro</h2>
-        <div style="display: flex; gap: 10px; align-items: center;">
+        <h2 style="margin:0; font-size: 16px; font-weight: 600; color: #111827;">AI Export Pro Preview</h2>
+        
+        <div style="display: flex; gap: 12px; align-items: center;">
           {status === 'generating' && (
-            <div style="display: flex; align-items: center; gap: 10px; margin-right: 15px;">
-              <div style="width: 20px; height: 20px; border: 3px solid #eee; border-top: 3px solid #2563eb; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-              <span style="font-size: 14px; color: #666; font-family: sans-serif;">Procesando...</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="width: 14px; height: 16px; border: 2px solid #eee; border-top: 2px solid #2563eb; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+              <span style="font-size: 13px; color: #666;">Exporting...</span>
             </div>
           )}
+          
           <button 
             onClick={handleDownload} 
             disabled={status === 'generating'}
@@ -52,22 +53,23 @@ export function PreviewPage() {
               background: '#2563eb',
               color: 'white',
               border: 'none',
-              padding: '10px 20px',
-              borderRadius: '8px',
-              cursor: status === 'generating' ? 'not-allowed' : 'pointer',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              cursor: status === 'generating' ? 'wait' : 'pointer',
               fontWeight: '600',
-              fontSize: '14px',
-              fontFamily: 'sans-serif',
+              fontSize: '13px',
+              transition: 'opacity 0.2s',
               opacity: status === 'generating' ? 0.7 : 1
             }}
           >
-            {status === 'generating' ? 'Generando...' : 'Descargar PDF'}
+            {status === 'generating' ? 'Wait...' : 'Download PDF'}
           </button>
+          
           <button 
             onClick={() => window.close()} 
-            style="background: white; color: #374151; border: 1px solid #d1d5db; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-family: sans-serif;"
+            style="background: white; color: #374151; border: 1px solid #d1d5db; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500;"
           >
-            Cerrar
+            Close
           </button>
         </div>
       </div>

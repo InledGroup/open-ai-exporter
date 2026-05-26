@@ -2,7 +2,7 @@ import { IAAdapter } from '../../../core/domain/IAAdapter';
 import { Message, Role } from '../../../core/domain/entities';
 
 export class NotebookLMAdapter implements IAAdapter {
-  // Selectores para NotebookLM (basados en componentes de chat y contenedores comunes)
+  // Better selectors for NotebookLM
   private readonly MESSAGE_SELECTOR = 'chat-message, .message-container, .conversation-turn';
   private readonly CHECKBOX_CLASS = 'ai-exporter-checkbox';
 
@@ -15,27 +15,26 @@ export class NotebookLMAdapter implements IAAdapter {
     const messages: Message[] = [];
 
     elements.forEach((el, index) => {
-      // Detección de roles avanzada para NotebookLM
-      const text = el.textContent || '';
       const html = el.innerHTML;
       
-      // La IA suele tener el tag 'chat-message' o atributos específicos
-      // También buscamos por clases comunes de Google o el icono del robot
+      // Better role detection:
+      // In Google Chat apps, AI messages often have an 'assistant' class or specific icons.
+      // Also, looking for 'chat-message' tags which usually have an 'author' attribute.
       const isAssistant = el.tagName.toLowerCase() === 'chat-message' || 
                           el.getAttribute('author') === 'assistant' ||
-                          el.classList.contains('assistant') || 
-                          el.classList.contains('model-response') ||
-                          html.includes('assistant-icon') ||
-                          html.includes('mat-icon') && html.includes('notebook') ||
-                          (text.length > 400 && !html.includes('user-avatar'));
+                          el.classList.contains('assistant') ||
+                          el.querySelector('[author="assistant"]') !== null ||
+                          el.querySelector('.assistant-icon') !== null ||
+                          el.querySelector('.mat-icon[svgicon*="notebook"]') !== null ||
+                          html.includes('robot') || 
+                          (el.textContent && el.textContent.length > 300 && !html.includes('user-avatar'));
       
       const role: Role = isAssistant ? 'assistant' : 'user';
       
-      // Capturamos el contenido rico
       const contentEl = el.querySelector('.message-text') || el.querySelector('.content') || el;
       const clone = contentEl.cloneNode(true) as HTMLElement;
 
-      // Limpieza de UI
+      // UI Cleanup
       clone.querySelectorAll('button, .sr-only, svg, .ai-exporter-checkbox').forEach(node => node.remove());
 
       messages.push({
@@ -61,10 +60,14 @@ export class NotebookLMAdapter implements IAAdapter {
       checkbox.className = this.CHECKBOX_CLASS;
       checkbox.dataset.id = `notebook-msg-${index}`;
       
-      // Estilo que no interfiera con los iconos de NotebookLM
       checkbox.style.cssText = `
-        position: absolute; left: -10px; top: 15px; z-index: 10000;
-        width: 18px; height: 18px; cursor: pointer;
+        position: absolute;
+        left: 5px;
+        top: 10px;
+        z-index: 999;
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
       `;
 
       checkbox.addEventListener('change', () => {
@@ -81,7 +84,6 @@ export class NotebookLMAdapter implements IAAdapter {
   }
 
   getConversationTitle(): string {
-    const titleEl = document.querySelector('.notebook-title') || document.querySelector('h1');
-    return titleEl?.textContent?.trim() || document.title || 'NotebookLM Conversation';
+    return document.title || 'NotebookLM Conversation';
   }
 }

@@ -14,20 +14,20 @@ export function PopupApp() {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tabId = tabs[0]?.id;
       if (!tabId) {
-        setError('No se pudo encontrar la pestaña activa.');
+        setError('Active tab not found.');
         setLoading(false);
         return;
       }
 
       chrome.tabs.sendMessage(tabId, { action: 'GET_MESSAGES' }, (response) => {
         if (chrome.runtime.lastError) {
-          setError(`Error de conexión: Por favor, refresca la página del chat.`);
+          setError(`Connection error: Please refresh the chat page.`);
           setLoading(false);
           return;
         }
         
         if (!response) {
-          setError('Esta página no es un chat compatible o no se detectaron mensajes.');
+          setError('This page is not a compatible chat or no messages were detected.');
         } else {
           setData(response);
         }
@@ -52,7 +52,6 @@ export function PopupApp() {
       const content = exportService.toMarkdown(messagesToExport, data.title);
       exportService.downloadFile(content, `${data.title}.md`, 'text/markdown');
     } else {
-      // Guardar datos en storage local y abrir nueva pestaña de la extensión
       chrome.storage.local.set({ 
         export_preview_data: { messages: messagesToExport, title: data.title } 
       }, () => {
@@ -64,14 +63,14 @@ export function PopupApp() {
 
   if (loading) return (
     <div class="p-4 w-64 bg-white text-center">
-      <p>Cargando mensajes...</p>
+      <p>Loading messages...</p>
     </div>
   );
 
   if (error) return (
     <div class="p-4 w-64 bg-white">
       <p class="text-red-600 mb-4 text-sm">{error}</p>
-      <button onClick={fetchData} class="w-full bg-gray-200 py-2 rounded text-sm">Reintentar</button>
+      <button onClick={fetchData} class="w-full bg-gray-200 py-2 rounded text-sm">Retry</button>
     </div>
   );
 
@@ -84,14 +83,14 @@ export function PopupApp() {
           onClick={() => handleExport('md', false)}
           class="w-full bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 text-sm"
         >
-          Exportar Todo (Markdown)
+          Export All (Markdown)
         </button>
         
         <button 
           onClick={() => handleExport('pdf_advanced', false)}
           class="w-full bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700 text-sm"
         >
-          Exportar Todo (PDF Pro)
+          Export All (PDF Pro)
         </button>
 
         <hr />
@@ -101,7 +100,7 @@ export function PopupApp() {
           onClick={() => handleExport('md', true)}
           class="w-full border border-blue-600 text-blue-600 px-3 py-2 rounded hover:bg-blue-50 disabled:opacity-50 text-sm"
         >
-          Seleccionados ({data?.selectedIds.length || 0}) (MD)
+          Selected ({data?.selectedIds.length || 0}) (MD)
         </button>
 
         <button 
@@ -109,7 +108,7 @@ export function PopupApp() {
           onClick={() => handleExport('pdf_advanced', true)}
           class="w-full border border-red-600 text-red-600 px-3 py-2 rounded hover:bg-red-50 disabled:opacity-50 text-sm"
         >
-          Seleccionados ({data?.selectedIds.length || 0}) (PDF Pro)
+          Selected ({data?.selectedIds.length || 0}) (PDF Pro)
         </button>
       </div>
     </div>
