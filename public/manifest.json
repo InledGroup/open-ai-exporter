@@ -22,7 +22,7 @@
         "*://notebooklm.google.com/*"
       ],
       "js": ["loader.js"],
-      "css": ["style.css"],
+      "css": ["content.css"],
       "run_at": "document_idle"
     }
   ],

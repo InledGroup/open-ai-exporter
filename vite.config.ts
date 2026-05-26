@@ -5,7 +5,6 @@ import { resolve } from 'path';
 export default defineConfig({
   plugins: [preact()],
   build: {
-    cssCodeSplit: false,
     rollupOptions: {
       input: {
         popup: resolve(__dirname, 'index.html'),

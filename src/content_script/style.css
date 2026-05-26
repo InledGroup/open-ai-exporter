@@ -1,16 +1,19 @@
-/* Estilos mínimos para los checkboxes inyectados */
+/* 
+  Estilos para los elementos inyectados en la página.
+  IMPORTANTE: No añadir estilos globales aquí (como body, button, etc.) 
+  para evitar romper el diseño de la web original.
+*/
+
 .ai-exporter-checkbox {
   appearance: checkbox !important;
   -webkit-appearance: checkbox !important;
-  width: 18px !important;
-  height: 18px !important;
+  width: 22px !important;
+  height: 22px !important;
   cursor: pointer !important;
   accent-color: #2563eb !important;
   z-index: 10000 !important;
   margin: 0 !important;
-}
-
-/* Evitar que estilos globales afecten a los elementos inyectados */
-.ai-exporter-checkbox:hover {
-  opacity: 1 !important;
+  border: 1px solid #333 !important;
+  border-radius: 4px !important;
+  background-color: #fff !important;
 }
