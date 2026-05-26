@@ -3,8 +3,8 @@ import { Message, Role } from '../../../core/domain/entities';
 
 export class ChatGPTAdapter implements IAAdapter {
   private readonly CHECKBOX_CLASS = 'ai-exporter-checkbox';
-  // Selector que cubre tanto la estructura antigua (article) como la nueva (section[data-turn-id])
-  private readonly MESSAGE_SELECTOR = 'section[data-turn-id], article, [data-testid^="conversation-turn-"]';
+  // Selector primario basado en el HTML real analizado
+  private readonly MESSAGE_SELECTOR = '[data-message-id]';
 
   isCurrentPage(): boolean {
     const host = window.location.hostname;
@@ -14,25 +14,30 @@ export class ChatGPTAdapter implements IAAdapter {
   getMessages(): Message[] {
     const elements = document.querySelectorAll(this.MESSAGE_SELECTOR);
     const messages: Message[] = [];
+    const seenIds = new Set<string>();
 
     elements.forEach((el, index) => {
       const container = el as HTMLElement;
       const { role, id } = this.findIdAndRole(container);
       
-      // Intentar encontrar el contenido real del mensaje
-      // 1. Clase markdown prose (típica del asistente)
-      // 2. Clase text-message (típica del usuario o asistente en nuevas versiones)
-      // 3. Fallback al propio contenedor si no hay nada más específico
-      const contentEl = container.querySelector('.markdown, .prose, .text-message') || 
-                        container.querySelector('[data-message-id] > div') ||
+      const msgId = id || `chatgpt-msg-${index}`;
+      if (seenIds.has(msgId)) return;
+      seenIds.add(msgId);
+
+      // Encontrar el contenido real:
+      // - .markdown .prose para el asistente
+      // - El div que contiene el texto para el usuario (usualmente hijo de flex-col)
+      const contentEl = container.querySelector('.markdown, .prose') || 
+                        container.querySelector('.text-message') ||
+                        container.querySelector('.flex-col.gap-1.break-words') ||
                         container;
 
       const clone = contentEl.cloneNode(true) as HTMLElement;
       
-      // Limpiar ruidos: botones, SVGs, textos ocultos y nuestros propios checkboxes
-      clone.querySelectorAll('button, svg, .sr-only, .' + this.CHECKBOX_CLASS + ', [data-testid*="copy-button"]').forEach(node => node.remove());
+      // Limpieza exhaustiva de la UI de ChatGPT
+      clone.querySelectorAll('button, svg, .sr-only, .' + this.CHECKBOX_CLASS + ', [data-testid*="copy-button"], [data-testid*="voice-"], .text-token-text-tertiary').forEach(node => node.remove());
       
-      // Limpiar bloques de código para que solo quede el <code> (mejor para MD/PDF)
+      // Limpiar bloques de código
       clone.querySelectorAll('pre').forEach(pre => {
         const code = pre.querySelector('code');
         if (code) {
@@ -42,7 +47,7 @@ export class ChatGPTAdapter implements IAAdapter {
       });
 
       messages.push({
-        id: id || `chatgpt-msg-${index}`,
+        id: msgId,
         role: (role as Role) || 'user',
         content: clone.innerHTML.trim()
       });
@@ -53,14 +58,11 @@ export class ChatGPTAdapter implements IAAdapter {
 
   injectCheckboxes(onSelectionChange: (selectedIds: string[]) => void): void {
     const elements = document.querySelectorAll(this.MESSAGE_SELECTOR);
-    if (elements.length === 0) return;
-
+    
     elements.forEach((el, index) => {
-      if (el.querySelector(`.${this.CHECKBOX_CLASS}`)) return;
-
       const container = el as HTMLElement;
-      
-      // Aseguramos posición relativa para que el checkbox absoluto se ubique bien
+      if (container.querySelector(`.${this.CHECKBOX_CLASS}`)) return;
+
       if (window.getComputedStyle(container).position === 'static') {
         container.style.position = 'relative';
       }
@@ -72,30 +74,36 @@ export class ChatGPTAdapter implements IAAdapter {
       const { id } = this.findIdAndRole(container);
       checkbox.dataset.id = id || `chatgpt-msg-${index}`;
       
-      // Estilo del checkbox (basado en sourcecode/Or.inject_checkbox)
       Object.assign(checkbox.style, {
         position: 'absolute',
-        left: '-10px',
-        top: '15px',
-        zIndex: '1000',
+        left: '10px',
+        top: '10px',
+        zIndex: '9999',
         width: '22px',
         height: '22px',
-        cursor: 'pointer'
+        cursor: 'pointer',
+        border: '2px solid #2563eb',
+        borderRadius: '4px'
       });
 
-      checkbox.addEventListener('change', () => {
+      checkbox.addEventListener('change', (e) => {
+        e.stopPropagation();
         onSelectionChange(this.getSelectedMessageIds());
       });
 
-      // Insertar al principio para que sea visible
       container.prepend(checkbox);
     });
+  }
 
-    // Ocultar la barra de herramientas inferior si estorba (como en M9 de sourcecode)
-    const threadBottom = document.querySelector('#thread-bottom-container');
-    if (threadBottom) {
-      (threadBottom as HTMLElement).style.display = 'none';
-    }
+  removeCheckboxes(): void {
+    document.querySelectorAll(`.${this.CHECKBOX_CLASS}`).forEach(el => el.remove());
+  }
+
+  selectAll(select: boolean): void {
+    const checkboxes = document.querySelectorAll(`input.${this.CHECKBOX_CLASS}`);
+    checkboxes.forEach(cb => {
+      (cb as HTMLInputElement).checked = select;
+    });
   }
 
   getSelectedMessageIds(): string[] {
@@ -104,36 +112,35 @@ export class ChatGPTAdapter implements IAAdapter {
   }
 
   getConversationTitle(): string {
-    // Buscamos el título en el elemento activo de la barra lateral o en el h1
-    const activeTitle = document.querySelector('[data-active="true"]') || 
-                        document.querySelector('nav li a.bg-token-sidebar-surface-tertiary') ||
-                        document.querySelector('h1');
-    return activeTitle?.textContent?.trim() || document.title || 'ChatGPT Conversation';
+    const titleEl = document.querySelector('[data-active="true"]') || 
+                    document.querySelector('nav li a.bg-token-sidebar-surface-tertiary') ||
+                    document.querySelector('h1') ||
+                    document.querySelector('title');
+    return titleEl?.textContent?.trim() || 'ChatGPT Conversation';
   }
 
   private findIdAndRole(e: HTMLElement): { role: string, id: string } {
-    let role = 'user';
-    let id = '';
+    // Buscar atributos directos
+    let role = e.getAttribute('data-message-author-role') || '';
+    let id = e.getAttribute('data-message-id') || '';
 
-    // 1. Buscar en el propio elemento (Estructura moderna encontrada en chatgpt.html)
-    const roleAttr = e.getAttribute('data-message-author-role') || 
-                     e.querySelector('[data-message-author-role]')?.getAttribute('data-message-author-role');
-    
-    if (roleAttr) {
-      role = roleAttr === 'user' ? 'user' : 'assistant';
-    } else {
-      // Fallbacks basados en contenido
-      if (e.querySelector('[data-testid*="user-message"]') || e.innerHTML.includes('user-avatar')) {
-        role = 'user';
-      } else if (e.querySelector('.assistant, .prose, .markdown')) {
-        role = 'assistant';
+    // Si no están, buscar en el primer descendiente que los tenga
+    if (!role || !id) {
+      const target = e.querySelector('[data-message-author-role], [data-message-id]');
+      if (target) {
+        role = role || target.getAttribute('data-message-author-role') || '';
+        id = id || target.getAttribute('data-message-id') || '';
       }
     }
 
-    // 2. Buscar ID del mensaje
-    id = e.getAttribute('data-message-id') || 
-         e.querySelector('[data-message-id]')?.getAttribute('data-message-id') || 
-         e.getAttribute('data-turn-id') || '';
+    // Fallback de rol basado en clases de Tailwind/ChatGPT
+    if (!role) {
+      if (e.querySelector('.assistant') || e.querySelector('.markdown') || e.querySelector('.prose')) {
+        role = 'assistant';
+      } else {
+        role = 'user';
+      }
+    }
 
     return { role, id };
   }

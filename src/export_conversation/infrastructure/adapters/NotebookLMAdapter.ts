@@ -46,8 +46,7 @@ export class NotebookLMAdapter implements IAAdapter {
   }
 
   injectCheckboxes(onSelectionChange: (selectedIds: string[]) => void): void {
-    const elements = document.querySelectorAll(this.MESSAGE_SELECTOR);
-    elements.forEach((el, index) => {
+    document.querySelectorAll(this.MESSAGE_SELECTOR).forEach((el, index) => {
       if (el.querySelector(`.${this.CHECKBOX_CLASS}`)) return;
 
       const container = el as HTMLElement;
@@ -57,14 +56,13 @@ export class NotebookLMAdapter implements IAAdapter {
       checkbox.type = 'checkbox';
       checkbox.className = this.CHECKBOX_CLASS;
       checkbox.dataset.id = `notebook-msg-${index}`;
-      
       checkbox.style.cssText = `
         position: absolute;
-        left: 5px;
+        left: -30px;
         top: 10px;
-        z-index: 999;
-        width: 18px;
-        height: 18px;
+        z-index: 1000;
+        width: 20px;
+        height: 20px;
         cursor: pointer;
       `;
 
@@ -73,6 +71,17 @@ export class NotebookLMAdapter implements IAAdapter {
       });
 
       container.prepend(checkbox);
+    });
+  }
+
+  removeCheckboxes(): void {
+    document.querySelectorAll(`.${this.CHECKBOX_CLASS}`).forEach(el => el.remove());
+  }
+
+  selectAll(select: boolean): void {
+    const checkboxes = document.querySelectorAll(`input.${this.CHECKBOX_CLASS}`);
+    checkboxes.forEach(cb => {
+      (cb as HTMLInputElement).checked = select;
     });
   }
 

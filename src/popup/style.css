@@ -36,6 +36,34 @@ button {
 .border-red-600 { border-color: #dc2626; color: #dc2626; background: white; }
 .border-red-600:hover { background-color: #fef2f2; }
 
+.flex { display: flex; }
+.justify-between { justify-content: space-between; }
+.items-center { align-items: center; }
+.gap-2 { gap: 0.5rem; }
+.flex-1 { flex: 1; }
+
+.px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+.py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+.text-xs { font-size: 0.75rem; }
+.font-medium { font-weight: 500; }
+.transition-colors { transition: all 0.2s; }
+
+.bg-green-100 { background-color: #dcfce7; }
+.text-green-700 { color: #15803d; }
+.border-green-200 { border-color: #bbf7d0; }
+
+.bg-gray-100 { background-color: #f3f4f6; }
+.text-gray-700 { color: #374151; }
+.border-gray-200 { border-color: #e5e7eb; }
+
+.bg-indigo-50 { background-color: #eef2ff; }
+.text-indigo-700 { color: #4338ca; }
+.border-indigo-200 { border-color: #e0e7ff; }
+
+.bg-stone-50 { background-color: #fafaf9; }
+.text-stone-700 { color: #44403c; }
+.border-stone-200 { border-color: #e7e5e4; }
+
 .disabled\:opacity-50:disabled {
   opacity: 0.5;
   cursor: not-allowed;

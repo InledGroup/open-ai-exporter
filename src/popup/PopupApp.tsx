@@ -3,7 +3,7 @@ import { ExportService } from '../export_conversation/application/ExportService'
 import { Message } from '../core/domain/entities';
 
 export function PopupApp() {
-  const [data, setData] = useState<{ messages: Message[], selectedIds: string[], title: string } | null>(null);
+  const [data, setData] = useState<{ messages: Message[], selectedIds: string[], title: string, selectionModeEnabled: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const exportService = new ExportService();
@@ -38,7 +38,42 @@ export function PopupApp() {
 
   useEffect(() => {
     fetchData();
+
+    // Escuchar cambios de selección en tiempo real
+    const messageListener = (request: any) => {
+      if (request.action === 'SELECTION_CHANGED') {
+        setData(prev => prev ? { ...prev, selectedIds: request.selectedIds } : null);
+      }
+    };
+    chrome.runtime.onMessage.addListener(messageListener);
+    return () => chrome.runtime.onMessage.removeListener(messageListener);
   }, []);
+
+  const toggleSelectionMode = () => {
+    if (!data) return;
+    const nextMode = !data.selectionModeEnabled;
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tabId = tabs[0]?.id;
+      if (tabId) {
+        chrome.tabs.sendMessage(tabId, { action: 'TOGGLE_SELECTION_MODE', enabled: nextMode }, () => {
+          setData({ ...data, selectionModeEnabled: nextMode, selectedIds: nextMode ? data.selectedIds : [] });
+        });
+      }
+    });
+  };
+
+  const handleSelectAll = (select: boolean) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tabId = tabs[0]?.id;
+      if (tabId) {
+        chrome.tabs.sendMessage(tabId, { action: 'SELECT_ALL', select }, (response) => {
+          if (response?.selectedIds) {
+            setData(prev => prev ? { ...prev, selectedIds: response.selectedIds } : null);
+          }
+        });
+      }
+    });
+  };
 
   const handleExport = (type: 'md' | 'pdf_advanced', onlySelected: boolean) => {
     if (!data || data.messages.length === 0) return;
@@ -76,9 +111,38 @@ export function PopupApp() {
 
   return (
     <div class="p-4 w-64 bg-white">
-      <h1 class="text-lg font-bold mb-4">AI Exporter</h1>
+      <div class="flex justify-between items-center mb-4">
+        <h1 class="text-lg font-bold">AI Exporter</h1>
+        <button 
+          onClick={toggleSelectionMode}
+          class={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+            data?.selectionModeEnabled 
+              ? 'bg-green-100 text-green-700 border border-green-200' 
+              : 'bg-gray-100 text-gray-700 border border-gray-200'
+          }`}
+        >
+          {data?.selectionModeEnabled ? 'Mode: ON' : 'Mode: OFF'}
+        </button>
+      </div>
       
       <div class="space-y-2">
+        {data?.selectionModeEnabled && (
+          <div class="flex gap-2 mb-2">
+            <button 
+              onClick={() => handleSelectAll(true)}
+              class="flex-1 bg-indigo-50 text-indigo-700 border border-indigo-200 py-1 rounded text-xs font-medium"
+            >
+              Select All
+            </button>
+            <button 
+              onClick={() => handleSelectAll(false)}
+              class="flex-1 bg-stone-50 text-stone-700 border border-stone-200 py-1 rounded text-xs font-medium"
+            >
+              Clear
+            </button>
+          </div>
+        )}
+
         <button 
           onClick={() => handleExport('md', false)}
           class="w-full bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 text-sm"

@@ -7,13 +7,25 @@
 .ai-exporter-checkbox {
   appearance: checkbox !important;
   -webkit-appearance: checkbox !important;
-  width: 22px !important;
-  height: 22px !important;
+  width: 20px !important;
+  height: 20px !important;
   cursor: pointer !important;
   accent-color: #2563eb !important;
-  z-index: 10000 !important;
+  z-index: 999999 !important;
   margin: 0 !important;
-  border: 1px solid #333 !important;
+  border: 2px solid #3b82f6 !important;
   border-radius: 4px !important;
   background-color: #fff !important;
+  box-shadow: 0 0 5px rgba(0,0,0,0.2) !important;
+  transition: transform 0.2s ease !important;
+}
+
+.ai-exporter-checkbox:hover {
+  transform: scale(1.2) !important;
+  opacity: 1 !important;
+}
+
+.ai-exporter-checkbox:checked {
+  opacity: 1 !important;
+  filter: drop-shadow(0 0 2px #2563eb) !important;
 }

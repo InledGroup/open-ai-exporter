@@ -14,17 +14,20 @@ const adapters: IAAdapter[] = [
 
 let activeAdapter: IAAdapter | null = null;
 let injectTimer: number | null = null;
+let selectionModeEnabled = false;
 
 function scheduleInjection() {
+  if (!selectionModeEnabled) return;
   if (injectTimer) {
     window.clearTimeout(injectTimer);
   }
   injectTimer = window.setTimeout(() => {
     activeAdapter?.injectCheckboxes(() => {
-      // Opcional: manejar cambios de selección si es necesario
+      // Notificar al popup si es necesario actualizar la cuenta de seleccionados
+      chrome.runtime.sendMessage({ action: 'SELECTION_CHANGED', selectedIds: activeAdapter?.getSelectedMessageIds() });
     });
     injectTimer = null;
-  }, 300); // Un poco más de tiempo para ser conservadores
+  }, 150);
 }
 
 function init() {
@@ -32,15 +35,13 @@ function init() {
   if (activeAdapter) {
     console.log('AI Exporter: Adaptador activo:', activeAdapter.constructor.name);
     
-    // Inyección inicial
-    scheduleInjection();
-
-    // Observar cambios
+    // Observar cambios siempre, pero solo inyectar si el modo está activo
     const observer = new MutationObserver((mutations) => {
+      if (!selectionModeEnabled) return;
+      
       let shouldInject = false;
       for (const mutation of mutations) {
         if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-          // Si se añadieron nodos que no son nuestros checkboxes, re-inyectar
           const addedElements = Array.from(mutation.addedNodes).filter(n => n instanceof HTMLElement) as HTMLElement[];
           if (addedElements.some(el => !el.classList.contains('ai-exporter-checkbox'))) {
             shouldInject = true;
@@ -53,23 +54,8 @@ function init() {
       }
     });
 
-    // Para ChatGPT, observar 'main' es más eficiente si existe
     const target = (activeAdapter instanceof ChatGPTAdapter && document.querySelector('main')) || document.body;
     observer.observe(target, { childList: true, subtree: true });
-
-    // Fallback: si es ChatGPT y no había main, esperar a que aparezca
-    if (activeAdapter instanceof ChatGPTAdapter && target === document.body) {
-      const mainWaiter = new MutationObserver(() => {
-        const main = document.querySelector('main');
-        if (main) {
-          mainWaiter.disconnect();
-          observer.disconnect();
-          observer.observe(main, { childList: true, subtree: true });
-          scheduleInjection();
-        }
-      });
-      mainWaiter.observe(document.body, { childList: true, subtree: true });
-    }
   }
 }
 
@@ -80,10 +66,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const messages = activeAdapter.getMessages();
       const title = activeAdapter.getConversationTitle();
       const selectedIds = activeAdapter.getSelectedMessageIds();
-      sendResponse({ messages, title, selectedIds });
+      sendResponse({ messages, title, selectedIds, selectionModeEnabled });
     } else {
       sendResponse(null);
     }
+    return true;
+  }
+
+  if (request.action === 'TOGGLE_SELECTION_MODE') {
+    selectionModeEnabled = request.enabled;
+    if (selectionModeEnabled) {
+      scheduleInjection();
+    } else {
+      activeAdapter?.removeCheckboxes();
+    }
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (request.action === 'SELECT_ALL') {
+    activeAdapter?.selectAll(request.select);
+    sendResponse({ selectedIds: activeAdapter?.getSelectedMessageIds() });
     return true;
   }
 });
