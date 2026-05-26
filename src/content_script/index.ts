@@ -42,7 +42,7 @@ function init() {
         if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
           // Si se añadieron nodos que no son nuestros checkboxes, re-inyectar
           const addedElements = Array.from(mutation.addedNodes).filter(n => n instanceof HTMLElement) as HTMLElement[];
-          if (addedElements.some(el => !el.classList.contains('capture-my-checkbox'))) {
+          if (addedElements.some(el => !el.classList.contains('ai-exporter-checkbox'))) {
             shouldInject = true;
             break;
           }

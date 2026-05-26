@@ -3,8 +3,8 @@ import { Message, Role } from '../../../core/domain/entities';
 
 export class ChatGPTAdapter implements IAAdapter {
   private readonly CHECKBOX_CLASS = 'ai-exporter-checkbox';
-  // Selector exacto del código de referencia (M9._selector)
-  private readonly MESSAGE_SELECTOR = 'main article > div.text-base > div';
+  // Selector que cubre tanto la estructura antigua (article) como la nueva (section[data-turn-id])
+  private readonly MESSAGE_SELECTOR = 'section[data-turn-id], article, [data-testid^="conversation-turn-"]';
 
   isCurrentPage(): boolean {
     const host = window.location.hostname;
@@ -16,16 +16,23 @@ export class ChatGPTAdapter implements IAAdapter {
     const messages: Message[] = [];
 
     elements.forEach((el, index) => {
-      const { role, id } = this.findIdAndRoleByParent(el as HTMLElement);
+      const container = el as HTMLElement;
+      const { role, id } = this.findIdAndRole(container);
       
-      // El contenido es el elemento en sí (o un clon para limpiar)
-      const clone = el.cloneNode(true) as HTMLElement;
+      // Intentar encontrar el contenido real del mensaje
+      // 1. Clase markdown prose (típica del asistente)
+      // 2. Clase text-message (típica del usuario o asistente en nuevas versiones)
+      // 3. Fallback al propio contenedor si no hay nada más específico
+      const contentEl = container.querySelector('.markdown, .prose, .text-message') || 
+                        container.querySelector('[data-message-id] > div') ||
+                        container;
+
+      const clone = contentEl.cloneNode(true) as HTMLElement;
       
-      // Limpiar elementos inyectados y botones (como en M9.getChatHtmls / transMarkdownHTML)
-      clone.querySelectorAll('button, svg, .sr-only, .' + this.CHECKBOX_CLASS).forEach(node => node.remove());
+      // Limpiar ruidos: botones, SVGs, textos ocultos y nuestros propios checkboxes
+      clone.querySelectorAll('button, svg, .sr-only, .' + this.CHECKBOX_CLASS + ', [data-testid*="copy-button"]').forEach(node => node.remove());
       
-      // ChatGPT a veces pone botones de "Copy" o selectores de modelo dentro
-      // Limpiamos selectores de pre (como en M9.transMarkdownHTML)
+      // Limpiar bloques de código para que solo quede el <code> (mejor para MD/PDF)
       clone.querySelectorAll('pre').forEach(pre => {
         const code = pre.querySelector('code');
         if (code) {
@@ -37,7 +44,7 @@ export class ChatGPTAdapter implements IAAdapter {
       messages.push({
         id: id || `chatgpt-msg-${index}`,
         role: (role as Role) || 'user',
-        content: clone.innerHTML
+        content: clone.innerHTML.trim()
       });
     });
 
@@ -52,7 +59,8 @@ export class ChatGPTAdapter implements IAAdapter {
       if (el.querySelector(`.${this.CHECKBOX_CLASS}`)) return;
 
       const container = el as HTMLElement;
-      // Replicando M9.injectCheckbox: n.style.position="relative"
+      
+      // Aseguramos posición relativa para que el checkbox absoluto se ubique bien
       if (window.getComputedStyle(container).position === 'static') {
         container.style.position = 'relative';
       }
@@ -61,17 +69,17 @@ export class ChatGPTAdapter implements IAAdapter {
       checkbox.type = 'checkbox';
       checkbox.className = this.CHECKBOX_CLASS;
       
-      const { id } = this.findIdAndRoleByParent(container);
+      const { id } = this.findIdAndRole(container);
       checkbox.dataset.id = id || `chatgpt-msg-${index}`;
       
-      // Estilos exactos de Or.inject_checkbox + M9.injectCheckbox
+      // Estilo del checkbox (basado en sourcecode/Or.inject_checkbox)
       Object.assign(checkbox.style, {
         position: 'absolute',
-        right: '-30px',
-        top: '10px',
+        left: '-10px',
+        top: '15px',
         zIndex: '1000',
-        width: '24px',
-        height: '24px',
+        width: '22px',
+        height: '22px',
         cursor: 'pointer'
       });
 
@@ -79,10 +87,11 @@ export class ChatGPTAdapter implements IAAdapter {
         onSelectionChange(this.getSelectedMessageIds());
       });
 
-      container.appendChild(checkbox);
+      // Insertar al principio para que sea visible
+      container.prepend(checkbox);
     });
 
-    // Ocultar el contenedor inferior (M9.injectCheckbox)
+    // Ocultar la barra de herramientas inferior si estorba (como en M9 de sourcecode)
     const threadBottom = document.querySelector('#thread-bottom-container');
     if (threadBottom) {
       (threadBottom as HTMLElement).style.display = 'none';
@@ -95,48 +104,36 @@ export class ChatGPTAdapter implements IAAdapter {
   }
 
   getConversationTitle(): string {
+    // Buscamos el título en el elemento activo de la barra lateral o en el h1
     const activeTitle = document.querySelector('[data-active="true"]') || 
-                        document.querySelector('nav li a.bg-token-sidebar-surface-tertiary');
+                        document.querySelector('nav li a.bg-token-sidebar-surface-tertiary') ||
+                        document.querySelector('h1');
     return activeTitle?.textContent?.trim() || document.title || 'ChatGPT Conversation';
   }
 
-  // Replicando logic de M9.findIdByParent y detectChatType
-  private findIdAndRoleByParent(e: HTMLElement): { role: string, id: string } {
+  private findIdAndRole(e: HTMLElement): { role: string, id: string } {
     let role = 'user';
     let id = '';
-    let curr: HTMLElement | null = e;
 
-    // Buscar data-turn y data-turn-id (como en findIdByParent)
-    for (let i = 0; i < 10 && curr; i++) {
-      const turn = curr.getAttribute('data-turn');
-      if (turn && !id) {
-        role = turn === 'user' ? 'user' : 'assistant';
+    // 1. Buscar en el propio elemento (Estructura moderna encontrada en chatgpt.html)
+    const roleAttr = e.getAttribute('data-message-author-role') || 
+                     e.querySelector('[data-message-author-role]')?.getAttribute('data-message-author-role');
+    
+    if (roleAttr) {
+      role = roleAttr === 'user' ? 'user' : 'assistant';
+    } else {
+      // Fallbacks basados en contenido
+      if (e.querySelector('[data-testid*="user-message"]') || e.innerHTML.includes('user-avatar')) {
+        role = 'user';
+      } else if (e.querySelector('.assistant, .prose, .markdown')) {
+        role = 'assistant';
       }
-      const turnId = curr.getAttribute('data-turn-id');
-      if (turnId && !id) {
-        id = turnId;
-      }
-      if (role && id) break;
-      curr = curr.parentElement;
     }
 
-    // Fallback para el rol usando detectChatType logic
-    if (role === 'user') {
-      curr = e;
-      for (let i = 0; i < 5 && curr; i++) {
-        if (curr.tagName === 'ARTICLE') {
-          const srOnly = curr.querySelectorAll('.sr-only');
-          for (let j = 0; j < srOnly.length; j++) {
-            if ((srOnly[j].textContent?.toLowerCase() || '').includes('chatgpt')) {
-              role = 'assistant';
-              break;
-            }
-          }
-          break;
-        }
-        curr = curr.parentElement;
-      }
-    }
+    // 2. Buscar ID del mensaje
+    id = e.getAttribute('data-message-id') || 
+         e.querySelector('[data-message-id]')?.getAttribute('data-message-id') || 
+         e.getAttribute('data-turn-id') || '';
 
     return { role, id };
   }
