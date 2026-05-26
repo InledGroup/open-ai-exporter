@@ -19,12 +19,10 @@ export class NotebookLMAdapter implements IAAdapter {
       
       // Better role detection:
       // In Google Chat apps, AI messages often have an 'assistant' class or specific icons.
-      // Also, looking for 'chat-message' tags which usually have an 'author' attribute.
-      const isAssistant = el.tagName.toLowerCase() === 'chat-message' || 
-                          el.getAttribute('author') === 'assistant' ||
+      // We look for 'chat-actions' or 'mat-card-actions' which are usually only in assistant messages.
+      const isAssistant = el.getAttribute('author') === 'assistant' ||
                           el.classList.contains('assistant') ||
-                          el.querySelector('[author="assistant"]') !== null ||
-                          el.querySelector('.assistant-icon') !== null ||
+                          el.querySelector('chat-actions, mat-card-actions, [author="assistant"], .assistant-icon') !== null ||
                           el.querySelector('.mat-icon[svgicon*="notebook"]') !== null ||
                           html.includes('robot') || 
                           (el.textContent && el.textContent.length > 300 && !html.includes('user-avatar'));
