@@ -1,3 +1,3 @@
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('AI Exporter Hexagonal: Extensión instalada.');
+  console.log("AI Exporter: Extensión instalada.");
 });

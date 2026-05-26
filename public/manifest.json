@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "AI Exporter Hexagonal",
+  "name": "AI Exporter",
   "version": "1.0.5",
   "description": "Exporta conversaciones de ChatGPT, Claude, Gemini y NotebookLM a MD y PDF Pro.",
   "icons": {

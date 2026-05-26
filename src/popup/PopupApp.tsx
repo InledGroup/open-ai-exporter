@@ -139,10 +139,18 @@ export function PopupApp() {
     try {
       if (type === "md") {
         const content = exportService.toMarkdown(messagesToExport, data.title);
-        exportService.downloadFile(content, `${data.title}.md`, "text/markdown");
+        exportService.downloadFile(
+          content,
+          `${data.title}.md`,
+          "text/markdown",
+        );
       } else if (type === "json") {
         const content = exportService.toJSON(messagesToExport);
-        exportService.downloadFile(content, `${data.title}.json`, "application/json");
+        exportService.downloadFile(
+          content,
+          `${data.title}.json`,
+          "application/json",
+        );
       } else if (type === "txt") {
         const content = exportService.toText(messagesToExport, data.title);
         exportService.downloadFile(content, `${data.title}.txt`, "text/plain");
@@ -151,7 +159,7 @@ export function PopupApp() {
         exportService.downloadFile(
           blob,
           `${data.title}.docx`,
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         );
       }
       setTimeout(() => setExporting(null), 1500);
@@ -185,7 +193,7 @@ export function PopupApp() {
       <header className="popup-header">
         <div className="header-logo-container">
           <img src="aiexporter.png" className="app-logo" alt="logo" />
-          <h1 className="app-title">AI Exporter Pro</h1>
+          <h1 className="app-title">AI Exporter</h1>
         </div>
         <button
           onClick={toggleSelectionMode}
@@ -244,7 +252,11 @@ export function PopupApp() {
             disabled={!!exporting}
             className="export-card"
           >
-            {exporting === "word" ? <div className="spinner-small" /> : <FileText size={18} className="card-icon" />}
+            {exporting === "word" ? (
+              <div className="spinner-small" />
+            ) : (
+              <FileText size={18} className="card-icon" />
+            )}
             <span className="card-label">WORD</span>
           </button>
 
@@ -286,7 +298,12 @@ export function PopupApp() {
                 onClick={() => handleExport("word", true)}
                 className="btn-action primary"
               >
-                {exporting === "word" ? <div className="spinner-small white" /> : <FileText size={12} />} WORD
+                {exporting === "word" ? (
+                  <div className="spinner-small white" />
+                ) : (
+                  <FileText size={12} />
+                )}{" "}
+                WORD
               </button>
               <button
                 disabled={!data || data.selectedIds.length === 0 || !!exporting}
@@ -301,7 +318,7 @@ export function PopupApp() {
       </div>
 
       <footer className="popup-footer">
-        <p>AI Exporter Pro • Inled</p>
+        <p>AI Exporter • Inled</p>
       </footer>
 
       <style>{`

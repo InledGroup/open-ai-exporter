@@ -1,5 +1,8 @@
 import { render } from "preact";
 import { useEffect, useState, useMemo } from "preact/hooks";
+import katex from "katex";
+import "katex/dist/katex.min.css";
+import renderMathInElement from "katex/dist/contrib/auto-render.mjs";
 import { ExportService } from "../application/ExportService";
 import { Message } from "../../core/domain/entities";
 import {
@@ -43,6 +46,25 @@ export function PreviewPage() {
     });
   }, []);
 
+  useEffect(() => {
+    if (data) {
+      setTimeout(() => {
+        const container = document.getElementById("preview-content");
+        if (container) {
+          renderMathInElement(container, {
+            delimiters: [
+              { left: "$$", right: "$$", display: true },
+              { left: "$", right: "$", display: false },
+              { left: "\\(", right: "\\)", display: false },
+              { left: "\\[", right: "\\]", display: true },
+            ],
+            throwOnError: false,
+          });
+        }
+      }, 100);
+    }
+  }, [data, isSelectionMode, selectedIds]);
+
   const getMessagesToExport = () => {
     if (!data) return [];
     return data.messages.filter((m) => selectedIds.has(m.id));
@@ -56,6 +78,7 @@ export function PreviewPage() {
     const wasSelectionMode = isSelectionMode;
     setIsSelectionMode(false);
 
+    // Wait a bit for the UI to update without checkboxes
     setTimeout(async () => {
       try {
         await exportService.exportToPdfWithCanvas(
@@ -104,7 +127,7 @@ export function PreviewPage() {
       exportService.downloadFile(
         blob,
         `${data.title}.docx`,
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       );
       setStatus("done");
       setTimeout(() => setStatus("idle"), 3000);
@@ -153,7 +176,7 @@ export function PreviewPage() {
       <header className="preview-header">
         <div className="header-left">
           <img src="aiexporter.png" alt="Logo" className="header-logo" />
-          <h2>AI Exporter Pro</h2>
+          <h2>AI Exporter</h2>
         </div>
 
         <div className="header-actions">
@@ -287,7 +310,7 @@ export function PreviewPage() {
           })}
 
           <footer className="content-footer">
-            Exportado con AI Exporter Pro Inled
+            Exportado con AI Exporter Inled
           </footer>
         </div>
       </main>

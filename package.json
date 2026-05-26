@@ -12,6 +12,7 @@
     "@preact/preset-vite": "^2.10.5",
     "@types/chrome": "^0.0.268",
     "@types/html2canvas": "^0.5.35",
+    "@types/katex": "^0.16.8",
     "@types/turndown": "^5.0.6",
     "typescript": "^5.0.0",
     "vite": "^5.0.0"
@@ -21,7 +22,9 @@
     "html-docx-js-typescript": "^0.1.5",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
+    "katex": "^0.17.0",
     "lucide-preact": "^0.300.0",
+    "mathjax": "^3.2.2",
     "preact": "^10.19.0",
     "turndown": "^7.2.4"
   }
