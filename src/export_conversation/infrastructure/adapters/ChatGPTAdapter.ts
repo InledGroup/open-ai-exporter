@@ -11,7 +11,7 @@ export class ChatGPTAdapter implements IAAdapter {
     return host.includes('chatgpt.com') || host.includes('chat.openai.com');
   }
 
-  getMessages(): Message[] {
+  async getMessages(): Promise<Message[]> {
     const elements = document.querySelectorAll(this.MESSAGE_SELECTOR);
     const messages: Message[] = [];
     const seenIds = new Set<string>();

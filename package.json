@@ -25,6 +25,7 @@
     "jspdf": "^4.2.1",
     "katex": "^0.17.0",
     "lucide-preact": "^0.300.0",
+    "marked": "^11.2.0",
     "mathjax": "^3.2.2",
     "preact": "^10.19.0",
     "turndown": "^7.2.4"

@@ -1,5 +1,6 @@
 import { render } from "preact";
 import { useEffect, useState, useMemo } from "preact/hooks";
+import { marked } from "marked";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import renderMathInElement from "katex/dist/contrib/auto-render.mjs";
@@ -30,8 +31,20 @@ export function PreviewPage() {
   const [status, setStatus] = useState<"idle" | "generating" | "done">("idle");
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  
+  // New customization state
+  const [fontSize, setFontSize] = useState(15);
+  const [bubbleWidth, setBubbleWidth] = useState(85); // Percentage
 
   const exportService = useMemo(() => new ExportService(), []);
+
+  // Configure marked
+  useEffect(() => {
+    marked.setOptions({
+      gfm: true,
+      breaks: true,
+    });
+  }, []);
 
   useEffect(() => {
     chrome.storage.local.get(["export_preview_data"], (result) => {
@@ -77,7 +90,6 @@ export function PreviewPage() {
     // Temporarily hide checkboxes and other non-pdf elements
     const wasSelectionMode = isSelectionMode;
     setIsSelectionMode(false);
-    const container = document.getElementById("preview-content");
     const mainWrapper = document.querySelector(".preview-container");
     if (mainWrapper) mainWrapper.classList.add("exporting-pdf");
 
@@ -185,6 +197,31 @@ export function PreviewPage() {
         </div>
 
         <div className="header-actions">
+          <div className="customizer-group">
+            <div className="control-item">
+              <span>Texto: {fontSize}px</span>
+              <input 
+                type="range" 
+                min="12" 
+                max="24" 
+                value={fontSize} 
+                onInput={(e) => setFontSize(parseInt((e.target as HTMLInputElement).value))} 
+              />
+            </div>
+            <div className="control-item">
+              <span>Ancho: {bubbleWidth}%</span>
+              <input 
+                type="range" 
+                min="50" 
+                max="100" 
+                value={bubbleWidth} 
+                onInput={(e) => setBubbleWidth(parseInt((e.target as HTMLInputElement).value))} 
+              />
+            </div>
+          </div>
+
+          <div className="divider" />
+
           <button
             onClick={() => setIsSelectionMode(!isSelectionMode)}
             className={`btn-secondary ${isSelectionMode ? "active" : ""}`}
@@ -300,7 +337,7 @@ export function PreviewPage() {
                   >
                     <div
                       className="content"
-                      dangerouslySetInnerHTML={{ __html: msg.content }}
+                      dangerouslySetInnerHTML={{ __html: marked.parse(msg.content) as string }}
                     />
                   </div>
                 </div>
@@ -380,8 +417,36 @@ export function PreviewPage() {
 
         .header-actions {
           display: flex;
-          gap: 10px;
+          gap: 15px;
           align-items: center;
+        }
+
+        .customizer-group {
+          display: flex;
+          gap: 20px;
+          background: #f3f4f6;
+          padding: 6px 15px;
+          border-radius: 10px;
+          align-items: center;
+        }
+
+        .control-item {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .control-item span {
+          font-size: 11px;
+          font-weight: 700;
+          color: var(--text-muted);
+          text-transform: uppercase;
+        }
+
+        .control-item input {
+          width: 80px;
+          accent-color: var(--primary-color);
+          cursor: pointer;
         }
 
         .btn-primary {
@@ -563,7 +628,7 @@ export function PreviewPage() {
         .ai-avatar { background: #ecfdf5; color: var(--primary-color); }
 
         .message-wrapper {
-          max-width: 80%;
+          max-width: ${bubbleWidth}%;
           display: flex;
           flex-direction: column;
         }
@@ -583,9 +648,10 @@ export function PreviewPage() {
         .bubble {
           padding: 16px 20px;
           border-radius: 18px;
-          font-size: 15px;
+          font-size: ${fontSize}px;
           line-height: 1.6;
           box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+          width: 100%;
         }
 
         .user-bubble {
@@ -643,6 +709,63 @@ export function PreviewPage() {
           padding: 0 !important;
           color: inherit !important;
           font-size: inherit !important;
+        }
+
+        /* Estilos para pensamiento (DeepSeek) y citas (Perplexity) */
+        .thinking-section {
+          background: #f8fafc;
+          border-left: 4px solid #94a3b8;
+          padding: 12px 16px;
+          margin-bottom: 16px;
+          border-radius: 4px;
+          font-style: italic;
+          color: #64748b;
+        }
+
+        .thinking-header {
+          font-weight: 700;
+          font-size: 0.85em;
+          text-transform: uppercase;
+          margin-bottom: 8px;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          color: #475569;
+        }
+
+        .thinking-header::before {
+          content: "💭";
+          font-style: normal;
+        }
+
+        .thinking-content {
+          font-size: 0.95em;
+          line-height: 1.5;
+        }
+
+        .citation {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: #e2e8f0;
+          color: #2563eb;
+          width: 1.4em;
+          height: 1.4em;
+          border-radius: 50%;
+          font-size: 0.75em;
+          margin: 0 2px;
+          vertical-align: super;
+          font-weight: 700;
+          text-decoration: none;
+        }
+
+        .citation a {
+          color: inherit;
+          text-decoration: none;
+        }
+
+        .citation:hover {
+          background: #cbd5e1;
         }
 
         .content-footer {

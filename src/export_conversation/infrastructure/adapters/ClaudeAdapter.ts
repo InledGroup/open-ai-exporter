@@ -9,7 +9,7 @@ export class ClaudeAdapter implements IAAdapter {
     return window.location.hostname.includes('claude.ai');
   }
 
-  getMessages(): Message[] {
+  async getMessages(): Promise<Message[]> {
     const elements = document.querySelectorAll(this.MESSAGE_SELECTOR);
     const messages: Message[] = [];
 

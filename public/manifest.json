@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "AI Exporter",
   "version": "1.0.5",
-  "description": "Exporta conversaciones de ChatGPT, Claude, Gemini y NotebookLM a MD y PDF Pro.",
+  "description": "Exporta conversaciones de ChatGPT, Claude, Gemini, Perplexity, Kimi y DeepSeek.",
   "icons": {
     "16": "aiexporter.png",
     "48": "aiexporter.png",
@@ -24,7 +24,12 @@
         "*://claude.ai/*",
         "*://gemini.google.com/*",
         "*://aistudio.google.com/*",
-        "*://notebooklm.google.com/*"
+        "*://notebooklm.google.com/*",
+        "*://*.perplexity.ai/*",
+        "*://kimi.ai/*",
+        "*://kimi.moonshot.cn/*",
+        "*://chat.deepseek.com/*",
+        "*://*.deepseek.com/*"
       ],
       "js": ["loader.js"],
       "css": ["content.css"],
@@ -37,7 +42,12 @@
     "*://claude.ai/*",
     "*://gemini.google.com/*",
     "*://aistudio.google.com/*",
-    "*://notebooklm.google.com/*"
+    "*://notebooklm.google.com/*",
+    "*://*.perplexity.ai/*",
+    "*://kimi.ai/*",
+    "*://kimi.moonshot.cn/*",
+    "*://chat.deepseek.com/*",
+    "*://*.deepseek.com/*"
   ],
   "web_accessible_resources": [
     {

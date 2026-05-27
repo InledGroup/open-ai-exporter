@@ -2,6 +2,9 @@ import { ChatGPTAdapter } from '../export_conversation/infrastructure/adapters/C
 import { ClaudeAdapter } from '../export_conversation/infrastructure/adapters/ClaudeAdapter';
 import { GeminiAdapter } from '../export_conversation/infrastructure/adapters/GeminiAdapter';
 import { NotebookLMAdapter } from '../export_conversation/infrastructure/adapters/NotebookLMAdapter';
+import { PerplexityAdapter } from '../export_conversation/infrastructure/adapters/PerplexityAdapter';
+import { KimiAdapter } from '../export_conversation/infrastructure/adapters/KimiAdapter';
+import { DeepSeekAdapter } from '../export_conversation/infrastructure/adapters/DeepSeekAdapter';
 import { IAAdapter } from '../core/domain/IAAdapter';
 import './style.css';
 
@@ -9,7 +12,10 @@ const adapters: IAAdapter[] = [
   new ChatGPTAdapter(),
   new ClaudeAdapter(),
   new GeminiAdapter(),
-  new NotebookLMAdapter()
+  new NotebookLMAdapter(),
+  new PerplexityAdapter(),
+  new KimiAdapter(),
+  new DeepSeekAdapter()
 ];
 
 let activeAdapter: IAAdapter | null = null;
@@ -63,10 +69,17 @@ function init() {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'GET_MESSAGES') {
     if (activeAdapter) {
-      const messages = activeAdapter.getMessages();
-      const title = activeAdapter.getConversationTitle();
-      const selectedIds = activeAdapter.getSelectedMessageIds();
-      sendResponse({ messages, title, selectedIds, selectionModeEnabled });
+      (async () => {
+        try {
+          const messages = await activeAdapter.getMessages();
+          const title = activeAdapter.getConversationTitle();
+          const selectedIds = activeAdapter.getSelectedMessageIds();
+          sendResponse({ messages, title, selectedIds, selectionModeEnabled });
+        } catch (err) {
+          console.error('AI Exporter: Error obteniendo mensajes:', err);
+          sendResponse(null);
+        }
+      })();
     } else {
       sendResponse(null);
     }
