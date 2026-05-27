@@ -40,13 +40,15 @@ export function PopupApp() {
 
       chrome.tabs.sendMessage(tabId, { action: "GET_MESSAGES" }, (response) => {
         if (chrome.runtime.lastError) {
-          setError(`Error de conexión: Recarga la página.`);
+          setError(`Connection error. Please, reload the page.`);
           setLoading(false);
           return;
         }
 
         if (!response) {
-          setError("Página no compatible o no hay mensajes.");
+          setError(
+            "No compatible website. Please, contact us if you need support for this website.",
+          );
         } else {
           setData(response);
         }
@@ -174,7 +176,7 @@ export function PopupApp() {
     return (
       <div className="popup-container loading-state">
         <div className="spinner-green"></div>
-        <p>Buscando mensajes...</p>
+        <p>Searching messages...</p>
       </div>
     );
 
@@ -183,7 +185,7 @@ export function PopupApp() {
       <div className="popup-container error-state">
         <p className="error-text">{error}</p>
         <button onClick={fetchData} className="btn-retry">
-          <RotateCcw size={14} /> Reintentar
+          <RotateCcw size={14} /> Retry
         </button>
       </div>
     );
@@ -204,9 +206,7 @@ export function PopupApp() {
           ) : (
             <MousePointer2 size={12} />
           )}
-          <span>
-            {data?.selectionModeEnabled ? "MODO SELECCIÓN" : "SELECCIÓN"}
-          </span>
+          <span>{data?.selectionModeEnabled ? "SELECT MODE" : "SELECT"}</span>
         </button>
       </header>
 
@@ -217,13 +217,13 @@ export function PopupApp() {
               onClick={() => handleSelectAll(true)}
               className="btn-control"
             >
-              <CheckSquare size={13} /> Todo
+              <CheckSquare size={13} /> All
             </button>
             <button
               onClick={() => handleSelectAll(false)}
               className="btn-control"
             >
-              <RotateCcw size={13} /> Limpiar
+              <RotateCcw size={13} /> Clear
             </button>
           </div>
         )}
@@ -283,7 +283,7 @@ export function PopupApp() {
           (data?.selectedIds.length || 0) > 0) && (
           <div className="selection-export animate-slide-up">
             <div className="selection-summary">
-              Seleccionados ({data?.selectedIds.length})
+              Selected ({data?.selectedIds.length})
             </div>
             <div className="export-grid mini">
               <button
@@ -318,7 +318,7 @@ export function PopupApp() {
       </div>
 
       <footer className="popup-footer">
-        <p>AI Exporter • Inled</p>
+        <p>AI Exporter • v1.0</p>
       </footer>
 
       <style>{`

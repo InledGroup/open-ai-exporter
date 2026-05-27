@@ -26,7 +26,7 @@ export class ExportService {
   toMarkdown(messages: Message[], title: string): string {
     let md = `# ${title}\n\n`;
     messages.forEach(msg => {
-      const roleName = msg.role === 'user' ? '**Tú**' : '**AI Assistant**';
+      const roleName = msg.role === 'user' ? '**You**' : '**AI Assistant**';
       const contentMd = this.turndown.turndown(msg.content);
       md += `### ${roleName}\n\n${contentMd}\n\n---\n\n`;
     });
@@ -36,7 +36,7 @@ export class ExportService {
   toText(messages: Message[], title: string): string {
     let text = `${title}\n\n`;
     messages.forEach(msg => {
-      const roleName = msg.role === 'user' ? 'Tú' : 'AI Assistant';
+      const roleName = msg.role === 'user' ? 'You' : 'AI Assistant';
       // Strip HTML tags for plain text
       const contentText = msg.content.replace(/<[^>]*>/g, '');
       text += `${roleName}:\n${contentText}\n\n-------------------\n\n`;
@@ -60,7 +60,7 @@ export class ExportService {
 
     messages.forEach(msg => {
       const isUser = msg.role === 'user';
-      const roleName = isUser ? 'Tú' : 'AI Assistant';
+      const roleName = isUser ? 'You' : 'AI Assistant';
       const roleColor = isUser ? '2563eb' : '3ac200';
       const bgColor = isUser ? 'F9FAFB' : 'F0FDF4'; 
       const borderColor = isUser ? 'E5E7EB' : 'DCFCE7';

@@ -1,13 +1,20 @@
-import { IAAdapter } from '../../../core/domain/IAAdapter';
-import { Message, Role } from '../../../core/domain/entities';
+import { IAAdapter } from "../../../core/domain/IAAdapter";
+import { Message, Role } from "../../../core/domain/entities";
 
 export class KimiAdapter implements IAAdapter {
-  private readonly CHECKBOX_CLASS = 'ai-exporter-checkbox';
-  private readonly DEFAULT_LIST_MESSAGES_URL = "https://www.kimi.com/apiv2/kimi.gateway.chat.v1.ChatService/ListMessages";
+  private readonly CHECKBOX_CLASS = "ai-exporter-checkbox";
+  private readonly DEFAULT_LIST_MESSAGES_URL =
+    "https://kimi.com/apiv2/kimi.gateway.chat.v1.ChatService/ListMessages";
 
   isCurrentPage(): boolean {
     const host = window.location.hostname;
-    return host.includes('kimi.ai') || host.includes('moonshot.cn') || host.includes('kimi.com');
+    return host.includes("kimi.com") || host.includes("moonshot.cn");
+  }
+
+  private normalizeMath(text: string): string {
+    return text
+      .replace(/\\\[([\s\S]*?)\\\]/g, "$$$$ $1 $$$$")
+      .replace(/\\\(([\s\S]*?)\\\)/g, "$ $1 $");
   }
 
   private getAuthTokenFromCookie(): string | null {
@@ -27,23 +34,27 @@ export class KimiAdapter implements IAAdapter {
   async getMessages(): Promise<Message[]> {
     const chat_id = this.extractConversationId();
     const token = this.getAuthTokenFromCookie();
-    if (!token) throw new Error("Failed to get Kimi auth token. Please make sure you are logged in.");
+    if (!token)
+      throw new Error(
+        "Failed to get Kimi auth token. Please make sure you are logged in.",
+      );
 
     const response = await fetch(this.DEFAULT_LIST_MESSAGES_URL, {
       method: "POST",
       credentials: "include",
       headers: {
-        "accept": "*/*",
-        "authorization": token,
+        accept: "*/*",
+        authorization: token,
         "content-type": "application/json",
-        "origin": "https://www.kimi.com",
+        origin: "https://kimi.com",
         "x-msh-platform": "web",
-        "x-msh-version": "1.0.0"
+        "x-msh-version": "1.0.0",
       },
-      body: JSON.stringify({ chat_id, page_size: 1000 })
+      body: JSON.stringify({ chat_id, page_size: 1000 }),
     });
 
-    if (!response.ok) throw new Error(`Kimi API request failed: ${response.status}`);
+    if (!response.ok)
+      throw new Error(`Kimi API request failed: ${response.status}`);
     const data = await response.json();
 
     return this.convertToMessages(data, chat_id);
@@ -61,7 +72,9 @@ export class KimiAdapter implements IAAdapter {
     if (refMap.size === 0) return text.replace(/\[\^\d+\^\]/g, "");
     return text.replace(/\[\^(\d+)\^\]/g, (match, num) => {
       const o = refMap.get(num);
-      return o ? ` [${o.base?.siteName || o.base?.title || num}](${o.base?.url})` : "";
+      return o
+        ? ` [${o.base?.siteName || o.base?.title || num}](${o.base?.url})`
+        : "";
     });
   }
 
@@ -72,15 +85,22 @@ export class KimiAdapter implements IAAdapter {
     for (const p of rawMessages) msgMap.set(p.id, p);
 
     // Encontrar el último mensaje (hoja)
-    let current = rawMessages.find((m: any) => !rawMessages.some((other: any) => slums(other.parentId) === m.id));
-    if (!current && rawMessages.length > 0) current = rawMessages[rawMessages.length - 1];
+    let current = rawMessages.find(
+      (m: any) =>
+        !rawMessages.some((other: any) => slums(other.parentId) === m.id),
+    );
+    if (!current && rawMessages.length > 0)
+      current = rawMessages[rawMessages.length - 1];
 
     const path: any[] = [];
     const seen = new Set();
     let temp = current;
     while (temp && !seen.has(temp.id)) {
       seen.add(temp.id);
-      if ((temp.role === "user" || temp.role === "assistant") && temp.status === "MESSAGE_STATUS_COMPLETED") {
+      if (
+        (temp.role === "user" || temp.role === "assistant") &&
+        temp.status === "MESSAGE_STATUS_COMPLETED"
+      ) {
         path.push(temp);
       }
       temp = temp.parentId ? msgMap.get(temp.parentId) : null;
@@ -90,8 +110,8 @@ export class KimiAdapter implements IAAdapter {
     for (const m of path) {
       const refMap = this.buildRefMap(m.blocks ?? [], m.refs);
       let contentParts: string[] = [];
-      
-      for (const block of (m.blocks ?? [])) {
+
+      for (const block of m.blocks ?? []) {
         if (block.text && typeof block.text.content === "string") {
           contentParts.push(this.resolveCitations(block.text.content, refMap));
         }
@@ -100,8 +120,8 @@ export class KimiAdapter implements IAAdapter {
       messages.push({
         id: m.id,
         role: m.role as Role,
-        content: contentParts.join('\n\n').trim(),
-        timestamp: new Date(m.createTime).getTime()
+        content: this.normalizeMath(contentParts.join("\n\n").trim()),
+        timestamp: new Date(m.createTime).getTime(),
       });
     }
 
@@ -114,10 +134,10 @@ export class KimiAdapter implements IAAdapter {
       if (el.querySelector(`.${this.CHECKBOX_CLASS}`)) return;
 
       const container = el as HTMLElement;
-      container.style.position = 'relative';
+      container.style.position = "relative";
 
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
       checkbox.className = this.CHECKBOX_CLASS;
       checkbox.dataset.id = `kimi-msg-${index}`;
       checkbox.style.cssText = `
@@ -130,7 +150,7 @@ export class KimiAdapter implements IAAdapter {
         cursor: pointer;
       `;
 
-      checkbox.addEventListener('change', () => {
+      checkbox.addEventListener("change", () => {
         onSelectionChange(this.getSelectedMessageIds());
       });
 
@@ -139,28 +159,38 @@ export class KimiAdapter implements IAAdapter {
   }
 
   removeCheckboxes(): void {
-    document.querySelectorAll(`.${this.CHECKBOX_CLASS}`).forEach(el => el.remove());
+    document
+      .querySelectorAll(`.${this.CHECKBOX_CLASS}`)
+      .forEach((el) => el.remove());
   }
 
   selectAll(select: boolean): void {
-    const checkboxes = document.querySelectorAll(`input.${this.CHECKBOX_CLASS}`);
-    checkboxes.forEach(cb => {
+    const checkboxes = document.querySelectorAll(
+      `input.${this.CHECKBOX_CLASS}`,
+    );
+    checkboxes.forEach((cb) => {
       (cb as HTMLInputElement).checked = select;
     });
   }
 
   getSelectedMessageIds(): string[] {
-    const checkboxes = document.querySelectorAll(`.${this.CHECKBOX_CLASS}:checked`);
-    return Array.from(checkboxes).map(cb => (cb as HTMLInputElement).dataset.id || '');
+    const checkboxes = document.querySelectorAll(
+      `.${this.CHECKBOX_CLASS}:checked`,
+    );
+    return Array.from(checkboxes).map(
+      (cb) => (cb as HTMLInputElement).dataset.id || "",
+    );
   }
 
   getConversationTitle(): string {
-    const titleEl = document.querySelector('[class*="title-text"]') || 
-                    document.querySelector('title');
-    return titleEl?.textContent?.trim() || 'Kimi Conversation';
+    const titleEl =
+      document.querySelector('[class*="title-text"]') ||
+      document.querySelector("title");
+    return titleEl?.textContent?.trim() || "Kimi Conversation";
   }
 }
 
 function slums(id: any) {
-  return typeof id === 'string' ? id : id?.id;
+  if (!id) return null;
+  return typeof id === "string" ? id : id.id || id.value;
 }

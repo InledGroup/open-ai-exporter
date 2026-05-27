@@ -31,18 +31,77 @@ export function PreviewPage() {
   const [status, setStatus] = useState<"idle" | "generating" | "done">("idle");
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  
+
   // New customization state
   const [fontSize, setFontSize] = useState(15);
   const [bubbleWidth, setBubbleWidth] = useState(85); // Percentage
 
   const exportService = useMemo(() => new ExportService(), []);
 
-  // Configure marked
+  // Configure marked with math support
   useEffect(() => {
-    marked.setOptions({
+    const mathExtension: any = {
+      name: "math",
+      level: "inline",
+      start(src: string) {
+        return src.match(/\$|\\\(|\\\[/)?.index;
+      },
+      tokenizer(src: string, tokens: any) {
+        // Display math $$ ... $$
+        const displayMatch = src.match(/^\$\$([\s\S]+?)\$\$/);
+        if (displayMatch) {
+          return {
+            type: "math",
+            raw: displayMatch[0],
+            text: displayMatch[1],
+            display: true,
+          };
+        }
+        // Inline math $ ... $
+        const inlineMatch = src.match(/^\$((?:[^\$]|\\\$)+)\$/);
+        if (inlineMatch) {
+          return {
+            type: "math",
+            raw: inlineMatch[0],
+            text: inlineMatch[1],
+            display: false,
+          };
+        }
+        // Display math \[ ... \]
+        const blockMatch = src.match(/^\\\[([\s\S]+?)\\\]/);
+        if (blockMatch) {
+          return {
+            type: "math",
+            raw: blockMatch[0],
+            text: blockMatch[1],
+            display: true,
+          };
+        }
+        // Inline math \( ... \)
+        const parenMatch = src.match(/^\\\(([\s\S]+?)\\\)/);
+        if (parenMatch) {
+          return {
+            type: "math",
+            raw: parenMatch[0],
+            text: parenMatch[1],
+            display: false,
+          };
+        }
+        return;
+      },
+      renderer(token: any) {
+        if (token.display) {
+          return `$$${token.text}$$`;
+        } else {
+          return `$${token.text}$`;
+        }
+      },
+    };
+
+    marked.use({
       gfm: true,
       breaks: true,
+      extensions: [mathExtension],
     });
   }, []);
 
@@ -179,7 +238,7 @@ export function PreviewPage() {
       <div style="padding: 50px; text-align: center; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 20px;">
         <div class="loader"></div>
         <div style="font-size: 18px; color: #3ac200; font-weight: 600;">
-          Cargando vista previa...
+          Loading preview...
         </div>
       </div>
     );
@@ -199,23 +258,27 @@ export function PreviewPage() {
         <div className="header-actions">
           <div className="customizer-group">
             <div className="control-item">
-              <span>Texto: {fontSize}px</span>
-              <input 
-                type="range" 
-                min="12" 
-                max="24" 
-                value={fontSize} 
-                onInput={(e) => setFontSize(parseInt((e.target as HTMLInputElement).value))} 
+              <span>Text: {fontSize}px</span>
+              <input
+                type="range"
+                min="12"
+                max="24"
+                value={fontSize}
+                onInput={(e) =>
+                  setFontSize(parseInt((e.target as HTMLInputElement).value))
+                }
               />
             </div>
             <div className="control-item">
-              <span>Ancho: {bubbleWidth}%</span>
-              <input 
-                type="range" 
-                min="50" 
-                max="100" 
-                value={bubbleWidth} 
-                onInput={(e) => setBubbleWidth(parseInt((e.target as HTMLInputElement).value))} 
+              <span>Width: {bubbleWidth}%</span>
+              <input
+                type="range"
+                min="50"
+                max="100"
+                value={bubbleWidth}
+                onInput={(e) =>
+                  setBubbleWidth(parseInt((e.target as HTMLInputElement).value))
+                }
               />
             </div>
           </div>
@@ -231,16 +294,16 @@ export function PreviewPage() {
             ) : (
               <ClipboardList size={18} />
             )}
-            {isSelectionMode ? "Cerrar Selección" : "Seleccionar mensajes"}
+            {isSelectionMode ? "Close select mode" : "Select messages"}
           </button>
 
           {isSelectionMode && (
             <>
               <button onClick={selectAll} className="btn-text">
-                <CheckSquare size={16} /> Seleccionar todo
+                <CheckSquare size={16} /> Select all
               </button>
               <button onClick={deselectAll} className="btn-text">
-                <Square size={16} /> Deseleccionar todo
+                <Square size={16} /> Deselect all
               </button>
             </>
           )}
@@ -330,14 +393,16 @@ export function PreviewPage() {
 
                 <div className="message-wrapper">
                   <div className="role-name">
-                    {isUser ? "Tú" : "AI Assistant"}
+                    {isUser ? "You" : "AI Assistant"}
                   </div>
                   <div
                     className={`bubble ${isUser ? "user-bubble" : "ai-bubble"}`}
                   >
                     <div
                       className="content"
-                      dangerouslySetInnerHTML={{ __html: marked.parse(msg.content) as string }}
+                      dangerouslySetInnerHTML={{
+                        __html: marked.parse(msg.content) as string,
+                      }}
                     />
                   </div>
                 </div>
@@ -352,7 +417,7 @@ export function PreviewPage() {
           })}
 
           <footer className="content-footer">
-            Exportado con AI Exporter Inled
+            Exported with AI Exporter, by Inled Group
           </footer>
         </div>
       </main>
@@ -667,11 +732,11 @@ export function PreviewPage() {
           border-top-left-radius: 4px;
         }
 
-        .content p, 
-        .content li, 
-        .content h1, 
-        .content h2, 
-        .content h3, 
+        .content p,
+        .content li,
+        .content h1,
+        .content h2,
+        .content h3,
         .content blockquote,
         .content pre {
           page-break-inside: avoid !important;

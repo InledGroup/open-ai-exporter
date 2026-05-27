@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "AI Exporter",
   "version": "1.0.5",
-  "description": "Exporta conversaciones de ChatGPT, Claude, Gemini, Perplexity, Kimi y DeepSeek.",
+  "description": "Export chats from ChatGPT, Claude, Gemini, Perplexity, Kimi y DeepSeek to PDF, MD, TXT, JSON and WORD.",
   "icons": {
     "16": "aiexporter.png",
     "48": "aiexporter.png",
@@ -26,7 +26,8 @@
         "*://aistudio.google.com/*",
         "*://notebooklm.google.com/*",
         "*://*.perplexity.ai/*",
-        "*://kimi.ai/*",
+        "*://*.kimi.com/*",
+        "*://kimi.com/*",
         "*://kimi.moonshot.cn/*",
         "*://chat.deepseek.com/*",
         "*://*.deepseek.com/*"

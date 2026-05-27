@@ -23,6 +23,12 @@ export class DeepSeekAdapter implements IAAdapter {
     return n[1];
   }
 
+  private normalizeMath(text: string): string {
+    return text
+      .replace(/\\\[([\s\S]*?)\\\]/g, "$$$$ $1 $$$$")
+      .replace(/\\\(([\s\S]*?)\\\)/g, "$ $1 $");
+  }
+
   async getMessages(): Promise<Message[]> {
     const conversationId = this.extractConversationId();
     const token = this.getUserToken();
@@ -73,9 +79,10 @@ export class DeepSeekAdapter implements IAAdapter {
       
       // Manejar contenido de razonamiento (thinking) con una estructura HTML estirable
       if (p.thinking_content && p.thinking_content.trim()) {
+        const thinkingContent = this.normalizeMath(p.thinking_content.trim());
         const thinkingHtml = `<div class="thinking-section">
-          <div class="thinking-header">Proceso de razonamiento</div>
-          <div class="thinking-content">${p.thinking_content.trim()}</div>
+          <div class="thinking-header">Reasoning Process</div>
+          <div class="thinking-content">${thinkingContent}</div>
         </div>`;
         content = `${thinkingHtml}\n\n${content}`;
       }
@@ -88,7 +95,7 @@ export class DeepSeekAdapter implements IAAdapter {
       r.push({
         id: `${n}_${p.message_id}`,
         role,
-        content: content.trim()
+        content: this.normalizeMath(content.trim())
       });
     }
     return r;

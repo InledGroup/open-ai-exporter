@@ -14,6 +14,12 @@ export class PerplexityAdapter implements IAAdapter {
     return n[1];
   }
 
+  private normalizeMath(text: string): string {
+    return text
+      .replace(/\\\[([\s\S]*?)\\\]/g, "$$$$ $1 $$$$")
+      .replace(/\\\(([\s\S]*?)\\\)/g, "$ $1 $");
+  }
+
   async getMessages(): Promise<Message[]> {
     const threadId = this.extractConversationId();
     const url = `https://www.perplexity.ai/rest/thread/${threadId}`;
@@ -123,7 +129,7 @@ export class PerplexityAdapter implements IAAdapter {
         messages.push({
           id: `${entry.uuid}_user`,
           role: "user",
-          content: entry.query_str,
+          content: this.normalizeMath(entry.query_str),
           timestamp
         });
       }
@@ -139,7 +145,7 @@ export class PerplexityAdapter implements IAAdapter {
         messages.push({
           id: `${entry.uuid}_assistant`,
           role: "assistant",
-          content,
+          content: this.normalizeMath(content),
           timestamp
         });
       }
