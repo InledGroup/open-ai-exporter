@@ -74,11 +74,14 @@ export function PreviewPage() {
     if (!data) return;
     setStatus("generating");
 
-    // Temporarily hide checkboxes for canvas capture
+    // Temporarily hide checkboxes and other non-pdf elements
     const wasSelectionMode = isSelectionMode;
     setIsSelectionMode(false);
+    const container = document.getElementById("preview-content");
+    const mainWrapper = document.querySelector(".preview-container");
+    if (mainWrapper) mainWrapper.classList.add("exporting-pdf");
 
-    // Wait a bit for the UI to update without checkboxes
+    // Wait a bit for the UI to update
     setTimeout(async () => {
       try {
         await exportService.exportToPdfWithCanvas(
@@ -86,15 +89,17 @@ export function PreviewPage() {
           `${data.title}.pdf`,
         );
         setStatus("done");
+        if (mainWrapper) mainWrapper.classList.remove("exporting-pdf");
         setIsSelectionMode(wasSelectionMode);
         setTimeout(() => setStatus("idle"), 3000);
       } catch (err) {
         console.error(err);
+        if (mainWrapper) mainWrapper.classList.remove("exporting-pdf");
         setStatus("idle");
         setIsSelectionMode(wasSelectionMode);
         alert("Error generating PDF");
       }
-    }, 500);
+    }, 800);
   };
 
   const handleDownloadMarkdown = () => {
@@ -281,7 +286,7 @@ export function PreviewPage() {
                 )}
 
                 {!isUser && (
-                  <div className="avatar ai-avatar">
+                  <div className="avatar ai-avatar no-pdf">
                     <Bot size={20} />
                   </div>
                 )}
@@ -301,7 +306,7 @@ export function PreviewPage() {
                 </div>
 
                 {isUser && (
-                  <div className="avatar user-avatar">
+                  <div className="avatar user-avatar no-pdf">
                     <User size={20} />
                   </div>
                 )}
@@ -337,7 +342,7 @@ export function PreviewPage() {
           display: flex;
           flex-direction: column;
           min-height: 100vh;
-          font-family: 'Inter', -apple-system, sans-serif;
+          font-family: Arial, Helvetica, sans-serif;
           color: var(--text-main);
         }
 
@@ -472,16 +477,26 @@ export function PreviewPage() {
           padding: 40px 20px;
           display: flex;
           justify-content: center;
-          background: white;
+          background: #f9fafb; /* Light grey background for the container */
         }
 
         .preview-content-area {
           width: 100%;
-          max-width: 850px;
+          max-width: 900px; /* Slightly wider to match 1080px viewport better */
           background: white;
-          padding: 40px;
+          padding: 60px; /* More padding for better margins */
           box-sizing: border-box;
           color-scheme: light;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.05); /* Preview shadow */
+        }
+
+        .exporting-pdf .no-pdf {
+          display: none !important;
+        }
+
+        .exporting-pdf .preview-content-area {
+          box-shadow: none !important;
+          padding: 40px !important;
         }
 
         .content-header {
@@ -586,6 +601,17 @@ export function PreviewPage() {
           border-top-left-radius: 4px;
         }
 
+        .content p, 
+        .content li, 
+        .content h1, 
+        .content h2, 
+        .content h3, 
+        .content blockquote,
+        .content pre {
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+
         .content p { margin: 0 0 1em 0; }
         .content p:last-child { margin-bottom: 0; }
 
@@ -600,16 +626,16 @@ export function PreviewPage() {
           white-space: pre-wrap !important;
           word-break: break-all !important;
           display: block !important;
-          break-inside: avoid;
-          page-break-inside: avoid;
+          font-weight: normal !important;
         }
 
         .content code {
-          font-family: 'Fira Code', monospace !important;
+          font-family: Arial, monospace !important;
           background: #f1f5f9;
           padding: 2px 5px;
           border-radius: 4px;
           font-size: 0.9em;
+          font-weight: normal !important;
         }
 
         .content pre code {

@@ -1,6 +1,7 @@
 import TurndownService from 'turndown';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import html2pdf from 'html2pdf.js';
 import { 
   Document, 
   Packer, 
@@ -225,36 +226,27 @@ export class ExportService {
     const element = document.getElementById(containerId);
     if (!element) return;
 
-    // Use a specific width for the PDF to ensure consistency
-    // A4 is 210mm wide. With 10mm margins, we have 190mm for content.
-    const pdf = new jsPDF({
-      orientation: 'p',
-      unit: 'mm',
-      format: 'a4',
-      compress: true
-    });
-
-    const margin = 10;
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const contentWidth = pdfWidth - (2 * margin);
-
-    // We need to temporarily clone the element or adjust its style 
-    // to ensure it renders well in the PDF width
-    await pdf.html(element, {
-      callback: (doc) => {
-        doc.save(filename);
-      },
-      x: margin,
-      y: margin,
-      width: contentWidth,
-      windowWidth: 850, // Matches the max-width in CSS
-      autoPaging: 'text',
-      html2canvas: {
-        useCORS: true,
+    const opt = {
+      margin: [15, 15], // More breathing room
+      filename: filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { 
+        scale: 2, 
+        useCORS: true, 
+        letterRendering: true,
         logging: false,
-        scale: 1
-      }
-    });
+        backgroundColor: '#ffffff'
+      },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: 'css' } // Rely on the CSS rules I just added
+    };
+
+    try {
+      await html2pdf().set(opt).from(element).save();
+    } catch (err) {
+      console.error('PDF Generation Error:', err);
+      throw err;
+    }
   }
 
   downloadFile(content: string | Blob, filename: string, type: string) {
