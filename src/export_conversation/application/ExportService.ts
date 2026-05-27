@@ -225,34 +225,36 @@ export class ExportService {
     const element = document.getElementById(containerId);
     if (!element) return;
 
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      windowWidth: element.scrollWidth,
-      windowHeight: element.scrollHeight
+    // Use a specific width for the PDF to ensure consistency
+    // A4 is 210mm wide. With 10mm margins, we have 190mm for content.
+    const pdf = new jsPDF({
+      orientation: 'p',
+      unit: 'mm',
+      format: 'a4',
+      compress: true
     });
 
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF('p', 'mm', 'a4');
+    const margin = 10;
     const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    const contentWidth = pdfWidth - (2 * margin);
 
-    let heightLeft = pdfHeight;
-    let position = 0;
-    const pageHeight = pdf.internal.pageSize.getHeight();
-
-    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-    heightLeft -= pageHeight;
-
-    while (heightLeft >= 0) {
-      position = heightLeft - pdfHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-      heightLeft -= pageHeight;
-    }
-
-    pdf.save(filename);
+    // We need to temporarily clone the element or adjust its style 
+    // to ensure it renders well in the PDF width
+    await pdf.html(element, {
+      callback: (doc) => {
+        doc.save(filename);
+      },
+      x: margin,
+      y: margin,
+      width: contentWidth,
+      windowWidth: 850, // Matches the max-width in CSS
+      autoPaging: 'text',
+      html2canvas: {
+        useCORS: true,
+        logging: false,
+        scale: 1
+      }
+    });
   }
 
   downloadFile(content: string | Blob, filename: string, type: string) {

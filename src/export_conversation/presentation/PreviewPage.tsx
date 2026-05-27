@@ -479,6 +479,9 @@ export function PreviewPage() {
           width: 100%;
           max-width: 850px;
           background: white;
+          padding: 40px;
+          box-sizing: border-box;
+          color-scheme: light;
         }
 
         .content-header {
@@ -499,6 +502,8 @@ export function PreviewPage() {
           gap: 16px;
           width: 100%;
           position: relative;
+          page-break-inside: avoid;
+          break-inside: avoid;
         }
 
         .user-row { justify-content: flex-end; }
@@ -585,21 +590,33 @@ export function PreviewPage() {
         .content p:last-child { margin-bottom: 0; }
 
         .content pre {
-          background: #1e293b;
-          color: #f8fafc;
-          padding: 16px;
-          border-radius: 12px;
-          font-size: 14px;
-          margin: 15px 0;
-          overflow-x: auto;
+          background: #1e293b !important;
+          color: #f8fafc !important;
+          padding: 16px !important;
+          border-radius: 12px !important;
+          font-size: 14px !important;
+          margin: 15px 0 !important;
+          overflow-x: hidden !important;
+          white-space: pre-wrap !important;
+          word-break: break-all !important;
+          display: block !important;
+          break-inside: avoid;
+          page-break-inside: avoid;
         }
 
         .content code {
-          font-family: 'Fira Code', monospace;
+          font-family: 'Fira Code', monospace !important;
           background: #f1f5f9;
           padding: 2px 5px;
           border-radius: 4px;
           font-size: 0.9em;
+        }
+
+        .content pre code {
+          background: transparent !important;
+          padding: 0 !important;
+          color: inherit !important;
+          font-size: inherit !important;
         }
 
         .content-footer {
