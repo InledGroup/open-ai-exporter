@@ -743,6 +743,54 @@ export function PreviewPage() {
           break-inside: avoid !important;
         }
 
+        /* Table styling */
+        .content table {
+          border-collapse: collapse;
+          width: 100%;
+          margin: 20px 0;
+          font-size: 0.9em;
+          border-radius: 8px;
+          border: 1px solid var(--border-color);
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+          page-break-inside: auto;
+          table-layout: auto;
+        }
+
+        .content th {
+          background-color: #f8fafc;
+          color: #475569;
+          font-weight: 700;
+          text-align: left;
+          padding: 10px 12px;
+          border-bottom: 2px solid var(--border-color);
+          border-right: 1px solid var(--border-color);
+        }
+
+        .content td {
+          padding: 10px 12px;
+          border-bottom: 1px solid var(--border-color);
+          border-right: 1px solid var(--border-color);
+          color: #334155;
+          word-break: break-word;
+          vertical-align: top;
+        }
+
+        .content th:last-child, .content td:last-child {
+          border-right: none;
+        }
+
+        .content tr:last-child td {
+          border-bottom: none;
+        }
+
+        .content tr:nth-child(even) {
+          background-color: #f9fafb;
+        }
+
+        .content tr {
+          page-break-inside: avoid;
+        }
+
         .content p { margin: 0 0 1em 0; }
         .content p:last-child { margin-bottom: 0; }
 
