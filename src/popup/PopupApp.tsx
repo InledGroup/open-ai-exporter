@@ -11,6 +11,9 @@ import {
   FileType,
   FileCode,
   FileOutput,
+  Github,
+  Star,
+  ExternalLink,
 } from "lucide-preact";
 
 type ExportType = "md" | "pdf_advanced" | "word" | "json" | "txt";
@@ -197,37 +200,9 @@ export function PopupApp() {
           <img src="aiexporter.png" className="app-logo" alt="logo" />
           <h1 className="app-title">AI Exporter</h1>
         </div>
-        <button
-          onClick={toggleSelectionMode}
-          className={`mode-badge ${data?.selectionModeEnabled ? "mode-active" : "mode-inactive"}`}
-        >
-          {data?.selectionModeEnabled ? (
-            <CheckCircle2 size={12} />
-          ) : (
-            <MousePointer2 size={12} />
-          )}
-          <span>{data?.selectionModeEnabled ? "SELECT MODE" : "SELECT"}</span>
-        </button>
       </header>
 
       <div className="popup-body">
-        {data?.selectionModeEnabled && (
-          <div className="selection-controls animate-fade-in">
-            <button
-              onClick={() => handleSelectAll(true)}
-              className="btn-control"
-            >
-              <CheckSquare size={13} /> All
-            </button>
-            <button
-              onClick={() => handleSelectAll(false)}
-              className="btn-control"
-            >
-              <RotateCcw size={13} /> Clear
-            </button>
-          </div>
-        )}
-
         <div className="export-grid">
           <button
             onClick={() => handleExport("md", false)}
@@ -277,44 +252,99 @@ export function PopupApp() {
             <FileType size={18} className="card-icon" />
             <span className="card-label">TXT</span>
           </button>
+
+          <button
+            onClick={toggleSelectionMode}
+            className={`filter-toggle-btn ${data?.selectionModeEnabled ? "active" : ""}`}
+          >
+            {data?.selectionModeEnabled ? (
+              <>
+                <CheckCircle2 size={14} />
+                <span>Filtering enabled</span>
+              </>
+            ) : (
+              <>
+                <MousePointer2 size={14} />
+                <span>Filter messages to export</span>
+              </>
+            )}
+          </button>
         </div>
 
-        {(data?.selectionModeEnabled ||
-          (data?.selectedIds.length || 0) > 0) && (
-          <div className="selection-export animate-slide-up">
-            <div className="selection-summary">
-              Selected ({data?.selectedIds.length})
+        {data?.selectionModeEnabled && (
+          <div className="selection-section animate-slide-up">
+            <div className="selection-controls">
+              <button
+                onClick={() => handleSelectAll(true)}
+                className="btn-control"
+              >
+                <CheckSquare size={13} /> Select all
+              </button>
+              <button
+                onClick={() => handleSelectAll(false)}
+                className="btn-control"
+              >
+                <RotateCcw size={13} /> Clear
+              </button>
             </div>
-            <div className="export-grid mini">
-              <button
-                disabled={!data || data.selectedIds.length === 0 || !!exporting}
-                onClick={() => handleExport("md", true)}
-                className="btn-action primary"
-              >
-                <FileCode size={12} /> MD
-              </button>
-              <button
-                disabled={!data || data.selectedIds.length === 0 || !!exporting}
-                onClick={() => handleExport("word", true)}
-                className="btn-action primary"
-              >
-                {exporting === "word" ? (
-                  <div className="spinner-small white" />
-                ) : (
-                  <FileText size={12} />
-                )}{" "}
-                WORD
-              </button>
-              <button
-                disabled={!data || data.selectedIds.length === 0 || !!exporting}
-                onClick={() => handleExport("pdf_advanced", true)}
-                className="btn-action primary"
-              >
-                <FileOutput size={12} /> PDF
-              </button>
+
+            <div className="selection-export">
+              <div className="selection-summary">
+                Selected messages ({data?.selectedIds.length})
+              </div>
+              <div className="export-grid mini">
+                <button
+                  disabled={
+                    !data || data.selectedIds.length === 0 || !!exporting
+                  }
+                  onClick={() => handleExport("md", true)}
+                  className="btn-action primary"
+                >
+                  <FileCode size={12} /> MD
+                </button>
+                <button
+                  disabled={
+                    !data || data.selectedIds.length === 0 || !!exporting
+                  }
+                  onClick={() => handleExport("word", true)}
+                  className="btn-action primary"
+                >
+                  {exporting === "word" ? (
+                    <div className="spinner-small white" />
+                  ) : (
+                    <FileText size={12} />
+                  )}{" "}
+                  WORD
+                </button>
+                <button
+                  disabled={
+                    !data || data.selectedIds.length === 0 || !!exporting
+                  }
+                  onClick={() => handleExport("pdf_advanced", true)}
+                  className="btn-action primary"
+                >
+                  <FileOutput size={12} /> PDF
+                </button>
+              </div>
             </div>
           </div>
         )}
+
+        <div className="cta-section">
+          <p className="cta-title">Help us grow! 🚀</p>
+          <p className="cta-text">
+            Contribute features, suggestions or give us a star on GitHub.
+          </p>
+          <a
+            href="https://github.com/InledGroup/open-ai-exporter"
+            target="_blank"
+            className="cta-button"
+          >
+            <Github size={14} />
+            <span>GitHub</span>
+            <Star size={14} className="star-icon" />
+          </a>
+        </div>
       </div>
 
       <footer className="popup-footer">
@@ -329,11 +359,14 @@ export function PopupApp() {
           --border: #e5e7eb;
           --text-dark: #1f2937;
           --text-muted: #6b7280;
+          --cta-bg: #f0fdf4;
+          --cta-border: #dcfce7;
+          --cta-text: #166534;
         }
 
         .popup-container {
-          width: 300px;
-          padding: 16px;
+          width: 320px;
+          padding: 20px;
           background: white;
           font-family: 'Inter', -apple-system, sans-serif;
         }
@@ -345,104 +378,57 @@ export function PopupApp() {
           justify-content: center;
           text-align: center;
           gap: 12px;
-          min-height: 150px;
+          min-height: 200px;
         }
 
         .popup-header {
           display: flex;
-          justify-content: space-between;
+          justify-content: center;
           align-items: center;
-          margin-bottom: 20px;
+          margin-bottom: 24px;
         }
 
         .header-logo-container {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 10px;
         }
 
         .app-logo {
-          width: 24px;
-          height: 24px;
-          border-radius: 4px;
+          width: 28px;
+          height: 28px;
+          border-radius: 6px;
           object-fit: contain;
         }
 
         .app-title {
-          font-size: 14px;
+          font-size: 18px;
           font-weight: 800;
           color: var(--text-dark);
           margin: 0;
+          letter-spacing: -0.02em;
         }
-
-        .mode-badge {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          padding: 4px 10px;
-          border-radius: 99px;
-          font-size: 10px;
-          font-weight: 800;
-          cursor: pointer;
-          transition: all 0.2s;
-          border: 1px solid transparent;
-        }
-
-        .mode-inactive {
-          background: #f3f4f6;
-          color: var(--text-muted);
-          border-color: var(--border);
-        }
-
-        .mode-active {
-          background: #ecfdf5;
-          color: var(--primary);
-          border-color: #3ac20044;
-        }
-
-        .selection-controls {
-          display: flex;
-          gap: 8px;
-          margin-bottom: 12px;
-        }
-
-        .btn-control {
-          flex: 1;
-          background: white;
-          border: 1px solid var(--border);
-          padding: 6px;
-          border-radius: 8px;
-          font-size: 11px;
-          font-weight: 600;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-          cursor: pointer;
-          transition: background 0.2s;
-        }
-
-        .btn-control:hover { background: #f9fafb; }
 
         .export-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 8px;
+          gap: 10px;
         }
 
         .export-grid.mini {
           grid-template-columns: repeat(3, 1fr);
+          gap: 8px;
         }
 
         .export-card {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 6px;
+          gap: 8px;
           background: #f9fafb;
           border: 1px solid #f3f4f6;
-          padding: 10px 4px;
-          border-radius: 10px;
+          padding: 12px 4px;
+          border-radius: 12px;
           cursor: pointer;
           transition: all 0.2s;
         }
@@ -450,8 +436,8 @@ export function PopupApp() {
         .export-card:hover:not(:disabled) {
           background: white;
           border-color: var(--primary);
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+          transform: translateY(-2px);
         }
 
         .export-card:disabled {
@@ -467,34 +453,101 @@ export function PopupApp() {
         .export-card:hover .card-icon { color: var(--primary); }
 
         .card-label {
-          font-size: 9px;
+          font-size: 10px;
           font-weight: 800;
           color: var(--text-muted);
         }
 
-        .selection-export {
+        .filter-toggle-btn {
+          grid-column: span 3;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 12px;
+          border-radius: 12px;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.2s;
+          border: 1px solid var(--border);
+          background: #f9fafb;
+          color: var(--text-muted);
+          margin-top: 4px;
+        }
+
+        .filter-toggle-btn:hover {
+          border-color: var(--primary);
+          background: white;
+          color: var(--primary);
+        }
+
+        .filter-toggle-btn.active {
+          background: #ecfdf5;
+          color: var(--primary);
+          border-color: #3ac20066;
+          box-shadow: inset 0 2px 4px rgba(58, 194, 0, 0.05);
+        }
+
+        .selection-section {
           margin-top: 16px;
-          padding-top: 12px;
-          border-top: 1px solid #f3f4f6;
+          border-top: 1px dashed var(--border);
+          padding-top: 16px;
+        }
+
+        .selection-controls {
+          display: flex;
+          gap: 10px;
+          margin-bottom: 16px;
+        }
+
+        .btn-control {
+          flex: 1;
+          background: white;
+          border: 1px solid var(--border);
+          padding: 8px;
+          border-radius: 10px;
+          font-size: 11px;
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          cursor: pointer;
+          transition: all 0.2s;
+          color: var(--text-dark);
+        }
+
+        .btn-control:hover { 
+          background: #f9fafb;
+          border-color: #9ca3af;
+        }
+
+        .selection-export {
+          background: #f8fafc;
+          padding: 12px;
+          border-radius: 12px;
+          border: 1px solid #f1f5f9;
         }
 
         .selection-summary {
           font-size: 10px;
           font-weight: 800;
           color: #9ca3af;
-          margin-bottom: 8px;
+          margin-bottom: 10px;
           text-transform: uppercase;
+          letter-spacing: 0.05em;
         }
 
         .btn-action {
-          padding: 8px 4px;
-          border-radius: 8px;
+          padding: 10px 4px;
+          border-radius: 10px;
           font-weight: 700;
           font-size: 10px;
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 4px;
+          gap: 6px;
           cursor: pointer;
           border: none;
           transition: all 0.2s;
@@ -507,7 +560,7 @@ export function PopupApp() {
 
         .primary:hover:not(:disabled) {
           background: var(--primary-hover);
-          box-shadow: 0 4px 12px rgba(58, 194, 0, 0.25);
+          box-shadow: 0 4px 12px rgba(58, 194, 0, 0.3);
         }
 
         .primary:disabled {
@@ -515,43 +568,92 @@ export function PopupApp() {
           cursor: not-allowed;
         }
 
-        .btn-retry {
-          background: #f3f4f6;
-          border: none;
-          padding: 8px 16px;
-          border-radius: 6px;
-          font-size: 12px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          cursor: pointer;
+        .cta-section {
+          margin-top: 24px;
+          padding: 16px;
+          background: var(--cta-bg);
+          border: 1px solid var(--cta-border);
+          border-radius: 16px;
+          text-align: center;
         }
 
-        .error-text {
-          color: #ef4444;
+        .cta-title {
+          font-size: 13px;
+          font-weight: 800;
+          color: var(--cta-text);
+          margin: 0 0 6px 0;
+        }
+
+        .cta-text {
+          font-size: 11px;
+          color: #15803d;
+          margin: 0 0 14px 0;
+          line-height: 1.5;
+        }
+
+        .cta-button {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: var(--cta-text);
+          color: white;
+          padding: 8px 16px;
+          border-radius: 10px;
           font-size: 12px;
-          font-weight: 500;
-          margin: 0;
+          font-weight: 700;
+          text-decoration: none;
+          transition: all 0.2s;
+        }
+
+        .cta-button:hover {
+          background: #14532d;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 8px rgba(20, 83, 45, 0.2);
+        }
+
+        .star-icon {
+          color: #fde047;
+          fill: #fde047;
         }
 
         .popup-footer {
-          margin-top: 20px;
-          padding-top: 12px;
+          margin-top: 24px;
+          padding-top: 16px;
           border-top: 1px solid #f3f4f6;
           text-align: center;
         }
 
         .popup-footer p {
           font-size: 10px;
-          color: #d1d5db;
+          color: #9ca3af;
+          font-weight: 600;
+          margin: 0;
+        }
+
+        .btn-retry {
+          background: #f3f4f6;
+          border: none;
+          padding: 10px 20px;
+          border-radius: 10px;
+          font-size: 12px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          font-weight: 600;
+        }
+
+        .error-text {
+          color: #ef4444;
+          font-size: 13px;
           font-weight: 600;
           margin: 0;
         }
 
         .spinner-green {
-          width: 24px;
-          height: 24px;
-          border: 3px solid #f3f4f6;
+          width: 32px;
+          height: 32px;
+          border: 4px solid #f3f4f6;
           border-top-color: var(--primary);
           border-radius: 50%;
           animation: spin 0.8s linear infinite;
@@ -573,10 +675,10 @@ export function PopupApp() {
 
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
         .animate-fade-in { animation: fadeIn 0.2s ease-out; }
-        .animate-slide-up { animation: slideUp 0.25s ease-out; }
+        .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
       `}</style>
     </div>
   );
