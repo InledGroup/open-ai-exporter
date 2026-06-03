@@ -16,8 +16,7 @@ if (isFirefox) {
   // Añadimos permiso de recolección de datos (requerido para nuevas extensiones en FF)
   if (manifest.browser_specific_settings && manifest.browser_specific_settings.gecko) {
     manifest.browser_specific_settings.gecko.data_collection_permissions = {
-      policy_url: "https://inled.es/privacy",
-      required: ["telemetry"]
+      required: ["none"]
     };
   }
 } else {

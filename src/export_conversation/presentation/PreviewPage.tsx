@@ -22,6 +22,7 @@ import {
   FileType,
   FileCode,
   FileOutput,
+  Menu,
 } from "lucide-preact";
 
 export function PreviewPage() {
@@ -32,6 +33,7 @@ export function PreviewPage() {
   const [status, setStatus] = useState<"idle" | "generating" | "done">("idle");
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // New customization state
   const [fontSize, setFontSize] = useState(15);
@@ -146,6 +148,7 @@ export function PreviewPage() {
   const handleDownloadPdf = async () => {
     if (!data) return;
     setStatus("generating");
+    setIsMenuOpen(false);
 
     // Temporarily hide checkboxes and other non-pdf elements
     const wasSelectionMode = isSelectionMode;
@@ -176,6 +179,7 @@ export function PreviewPage() {
 
   const handleDownloadMarkdown = () => {
     if (!data) return;
+    setIsMenuOpen(false);
     const messagesToExport = getMessagesToExport();
     const md = exportService.toMarkdown(messagesToExport, data.title);
     exportService.downloadFile(md, `${data.title}.md`, "text/markdown");
@@ -183,6 +187,7 @@ export function PreviewPage() {
 
   const handleDownloadJSON = () => {
     if (!data) return;
+    setIsMenuOpen(false);
     const messagesToExport = getMessagesToExport();
     const json = exportService.toJSON(messagesToExport);
     exportService.downloadFile(json, `${data.title}.json`, "application/json");
@@ -190,6 +195,7 @@ export function PreviewPage() {
 
   const handleDownloadTXT = () => {
     if (!data) return;
+    setIsMenuOpen(false);
     const messagesToExport = getMessagesToExport();
     const txt = exportService.toText(messagesToExport, data.title);
     exportService.downloadFile(txt, `${data.title}.txt`, "text/plain");
@@ -198,6 +204,7 @@ export function PreviewPage() {
   const handleDownloadWord = async () => {
     if (!data) return;
     setStatus("generating");
+    setIsMenuOpen(false);
     try {
       const messagesToExport = getMessagesToExport();
       const blob = await exportService.toWord(messagesToExport, data.title);
@@ -256,7 +263,14 @@ export function PreviewPage() {
           <h2>AI Exporter</h2>
         </div>
 
-        <div className="header-actions">
+        <button 
+          className="mobile-menu-toggle"
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+        >
+          {isMenuOpen ? <XCircle size={24} /> : <Menu size={24} />}
+        </button>
+
+        <div className={`header-actions ${isMenuOpen ? 'mobile-open' : ''}`}>
           <div className="customizer-group">
             <div className="control-item">
               <span>Text: {fontSize}px</span>
@@ -287,7 +301,10 @@ export function PreviewPage() {
           <div className="divider" />
 
           <button
-            onClick={() => setIsSelectionMode(!isSelectionMode)}
+            onClick={() => {
+              setIsSelectionMode(!isSelectionMode);
+              if (window.innerWidth < 768) setIsMenuOpen(false);
+            }}
             className={`btn-secondary ${isSelectionMode ? "active" : ""}`}
           >
             {isSelectionMode ? (
@@ -299,60 +316,62 @@ export function PreviewPage() {
           </button>
 
           {isSelectionMode && (
-            <>
+            <div className="selection-quick-actions">
               <button onClick={selectAll} className="btn-text">
                 <CheckSquare size={16} /> Select all
               </button>
               <button onClick={deselectAll} className="btn-text">
                 <Square size={16} /> Deselect all
               </button>
-            </>
+            </div>
           )}
 
           <div className="divider" />
 
-          <button
-            onClick={handleDownloadWord}
-            disabled={status === "generating"}
-            className="btn-primary"
-          >
-            {status === "generating" ? (
-              <div class="spinner"></div>
-            ) : (
-              <FileText size={18} />
-            )}
-            {status === "generating" ? "..." : "Word"}
-          </button>
+          <div className="export-buttons-group">
+            <button
+              onClick={handleDownloadWord}
+              disabled={status === "generating"}
+              className="btn-primary"
+            >
+              {status === "generating" ? (
+                <div class="spinner"></div>
+              ) : (
+                <FileText size={18} />
+              )}
+              {status === "generating" ? "..." : "Word"}
+            </button>
 
-          <button
-            onClick={handleDownloadPdf}
-            disabled={status === "generating"}
-            className="btn-primary"
-          >
-            {status === "generating" ? (
-              <div class="spinner"></div>
-            ) : (
-              <FileOutput size={18} />
-            )}
-            {status === "generating" ? "..." : "PDF"}
-          </button>
+            <button
+              onClick={handleDownloadPdf}
+              disabled={status === "generating"}
+              className="btn-primary"
+            >
+              {status === "generating" ? (
+                <div class="spinner"></div>
+              ) : (
+                <FileOutput size={18} />
+              )}
+              {status === "generating" ? "..." : "PDF"}
+            </button>
 
-          <button onClick={handleDownloadMarkdown} className="btn-primary">
-            <FileCode size={18} />
-            MD
-          </button>
+            <button onClick={handleDownloadMarkdown} className="btn-primary">
+              <FileCode size={18} />
+              MD
+            </button>
 
-          <button onClick={handleDownloadJSON} className="btn-primary">
-            <FileJson size={18} />
-            JSON
-          </button>
+            <button onClick={handleDownloadJSON} className="btn-primary">
+              <FileJson size={18} />
+              JSON
+            </button>
 
-          <button onClick={handleDownloadTXT} className="btn-primary">
-            <FileType size={18} />
-            TXT
-          </button>
+            <button onClick={handleDownloadTXT} className="btn-primary">
+              <FileType size={18} />
+              TXT
+            </button>
+          </div>
 
-          <button onClick={() => window.close()} className="btn-close">
+          <button onClick={() => window.close()} className="btn-close desktop-only">
             <XCircle size={18} />
           </button>
         </div>
@@ -371,7 +390,7 @@ export function PreviewPage() {
             return (
               <div
                 key={msg.id}
-                className={`message-row ${isUser ? "user-row" : "ai-row"}`}
+                className={`message-row ${isUser ? "user-row" : "ai-row"} ${isSelectionMode ? 'with-selection' : ''}`}
               >
                 {isSelectionMode && (
                   <div
@@ -439,13 +458,14 @@ export function PreviewPage() {
           margin: 0;
           padding: 0;
           background: #f9fafb;
+          -webkit-tap-highlight-color: transparent;
         }
 
         .preview-container {
           display: flex;
           flex-direction: column;
           min-height: 100vh;
-          font-family: Arial, Helvetica, sans-serif;
+          font-family: Inter, system-ui, -apple-system, sans-serif;
           color: var(--text-main);
         }
 
@@ -487,6 +507,15 @@ export function PreviewPage() {
           align-items: center;
         }
 
+        .mobile-menu-toggle {
+          display: none;
+          background: none;
+          border: none;
+          color: var(--text-main);
+          cursor: pointer;
+          padding: 5px;
+        }
+
         .customizer-group {
           display: flex;
           gap: 20px;
@@ -515,6 +544,12 @@ export function PreviewPage() {
           cursor: pointer;
         }
 
+        .export-buttons-group {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+
         .btn-primary {
           background: var(--primary-color);
           color: white;
@@ -528,6 +563,7 @@ export function PreviewPage() {
           align-items: center;
           gap: 8px;
           transition: all 0.2s ease;
+          white-space: nowrap;
         }
 
         .btn-primary:hover {
@@ -549,6 +585,7 @@ export function PreviewPage() {
           align-items: center;
           gap: 8px;
           transition: all 0.2s ease;
+          white-space: nowrap;
         }
 
         .btn-secondary:hover {
@@ -603,22 +640,28 @@ export function PreviewPage() {
           margin: 0 5px;
         }
 
+        .selection-quick-actions {
+          display: flex;
+          gap: 5px;
+        }
+
         .preview-main {
           flex: 1;
           padding: 40px 20px;
           display: flex;
           justify-content: center;
-          background: #f9fafb; /* Light grey background for the container */
+          background: #f9fafb;
         }
 
         .preview-content-area {
           width: 100%;
-          max-width: 900px; /* Slightly wider to match 1080px viewport better */
+          max-width: 900px;
           background: white;
-          padding: 60px; /* More padding for better margins */
+          padding: 60px;
           box-sizing: border-box;
           color-scheme: light;
-          box-shadow: 0 4px 20px rgba(0,0,0,0.05); /* Preview shadow */
+          box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+          border-radius: 12px;
         }
 
         .exporting-pdf .no-pdf {
@@ -628,6 +671,7 @@ export function PreviewPage() {
         .exporting-pdf .preview-content-area {
           box-shadow: none !important;
           padding: 40px !important;
+          border-radius: 0 !important;
         }
 
         .content-header {
@@ -640,6 +684,7 @@ export function PreviewPage() {
           font-weight: 800;
           color: #111827;
           margin: 0;
+          word-break: break-word;
         }
 
         .message-row {
@@ -666,6 +711,7 @@ export function PreviewPage() {
           width: 30px;
           height: 30px;
           transition: transform 0.2s;
+          z-index: 10;
         }
 
         .selection-checkbox:hover {
@@ -677,6 +723,7 @@ export function PreviewPage() {
           height: 22px;
           border: 2px solid #d1d5db;
           border-radius: 50%;
+          background: white;
         }
 
         .avatar {
@@ -718,6 +765,7 @@ export function PreviewPage() {
           line-height: 1.6;
           box-shadow: 0 1px 2px rgba(0,0,0,0.05);
           width: 100%;
+          word-break: break-word;
         }
 
         .user-bubble {
@@ -733,68 +781,6 @@ export function PreviewPage() {
           border-top-left-radius: 4px;
         }
 
-        .content p,
-        .content li,
-        .content h1,
-        .content h2,
-        .content h3,
-        .content blockquote,
-        .content pre {
-          page-break-inside: avoid !important;
-          break-inside: avoid !important;
-        }
-
-        /* Table styling */
-        .content table {
-          border-collapse: collapse;
-          width: 100%;
-          margin: 20px 0;
-          font-size: 0.9em;
-          border-radius: 8px;
-          border: 1px solid var(--border-color);
-          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-          page-break-inside: auto;
-          table-layout: auto;
-        }
-
-        .content th {
-          background-color: #f8fafc;
-          color: #475569;
-          font-weight: 700;
-          text-align: left;
-          padding: 10px 12px;
-          border-bottom: 2px solid var(--border-color);
-          border-right: 1px solid var(--border-color);
-        }
-
-        .content td {
-          padding: 10px 12px;
-          border-bottom: 1px solid var(--border-color);
-          border-right: 1px solid var(--border-color);
-          color: #334155;
-          word-break: break-word;
-          vertical-align: top;
-        }
-
-        .content th:last-child, .content td:last-child {
-          border-right: none;
-        }
-
-        .content tr:last-child td {
-          border-bottom: none;
-        }
-
-        .content tr:nth-child(even) {
-          background-color: #f9fafb;
-        }
-
-        .content tr {
-          page-break-inside: avoid;
-        }
-
-        .content p { margin: 0 0 1em 0; }
-        .content p:last-child { margin-bottom: 0; }
-
         .content pre {
           background: #1e293b !important;
           color: #f8fafc !important;
@@ -802,113 +788,126 @@ export function PreviewPage() {
           border-radius: 12px !important;
           font-size: 14px !important;
           margin: 15px 0 !important;
-          overflow-x: hidden !important;
+          overflow-x: auto !important;
           white-space: pre-wrap !important;
           word-break: break-all !important;
           display: block !important;
-          font-weight: normal !important;
         }
 
-        .content code {
-          font-family: Arial, monospace !important;
-          background: #f1f5f9;
-          padding: 2px 5px;
-          border-radius: 4px;
-          font-size: 0.9em;
-          font-weight: normal !important;
+        .content table {
+          display: block;
+          overflow-x: auto;
+          white-space: nowrap;
         }
 
-        .content pre code {
-          background: transparent !important;
-          padding: 0 !important;
-          color: inherit !important;
-          font-size: inherit !important;
+        @media (max-width: 768px) {
+          .preview-header {
+            padding: 10px 15px;
+          }
+
+          .mobile-menu-toggle {
+            display: block;
+          }
+
+          .header-actions {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            flex-direction: column;
+            padding: 20px;
+            gap: 15px;
+            border-bottom: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            align-items: stretch;
+          }
+
+          .header-actions.mobile-open {
+            display: flex;
+          }
+
+          .customizer-group {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+          }
+
+          .control-item input {
+            width: 100%;
+          }
+
+          .export-buttons-group {
+            flex-wrap: wrap;
+            justify-content: center;
+          }
+
+          .btn-primary, .btn-secondary {
+            justify-content: center;
+          }
+
+          .divider {
+            display: none;
+          }
+
+          .desktop-only {
+            display: none;
+          }
+
+          .preview-main {
+            padding: 10px;
+          }
+
+          .preview-content-area {
+            padding: 30px 15px;
+          }
+
+          .content-header h1 {
+            font-size: 22px;
+          }
+
+          .message-row {
+            gap: 8px;
+            margin-bottom: 20px;
+          }
+
+          .avatar {
+            width: 32px;
+            height: 32px;
+          }
+
+          .bubble {
+            padding: 12px 15px;
+            font-size: ${fontSize}px;
+          }
+
+          .message-wrapper {
+            max-width: ${bubbleWidth}%;
+          }
+
+          .selection-checkbox {
+            left: -5px;
+            top: -10px;
+            background: white;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          }
+
+          .with-selection {
+            padding-left: 10px;
+          }
         }
 
-        /* Estilos para pensamiento (DeepSeek) y citas (Perplexity) */
-        .thinking-section {
-          background: #f8fafc;
-          border-left: 4px solid #94a3b8;
-          padding: 12px 16px;
-          margin-bottom: 16px;
-          border-radius: 4px;
-          font-style: italic;
-          color: #64748b;
-        }
-
-        .thinking-header {
-          font-weight: 700;
-          font-size: 0.85em;
-          text-transform: uppercase;
-          margin-bottom: 8px;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          color: #475569;
-        }
-
-        .thinking-header::before {
-          content: "💭";
-          font-style: normal;
-        }
-
-        .thinking-content {
-          font-size: 0.95em;
-          line-height: 1.5;
-        }
-
-        .citation {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          background: #e2e8f0;
-          color: #2563eb;
-          width: 1.4em;
-          height: 1.4em;
-          border-radius: 50%;
-          font-size: 0.75em;
-          margin: 0 2px;
-          vertical-align: super;
-          font-weight: 700;
-          text-decoration: none;
-        }
-
-        .citation a {
-          color: inherit;
-          text-decoration: none;
-        }
-
-        .citation:hover {
-          background: #cbd5e1;
+        /* Tables & Pre again for mobile */
+        .content table {
+          font-size: 0.8em;
         }
 
         .content-footer {
-          text-align: center;
-          color: var(--text-muted);
-          font-size: 12px;
-          margin-top: 60px;
-          padding: 40px 0;
-          border-top: 1px solid var(--border-color);
-        }
-
-        /* Animations */
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .spinner {
-          width: 16px;
-          height: 16px;
-          border: 2px solid rgba(255,255,255,0.3);
-          border-top: 2px solid white;
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-        }
-
-        .loader {
-          border: 4px solid #f3f4f6;
-          border-top: 4px solid var(--primary-color);
-          border-radius: 50%;
-          width: 40px;
-          height: 40px;
-          animation: spin 1s linear infinite;
+          font-size: 11px;
+          margin-top: 30px;
+          padding: 20px 0;
         }
       `}</style>
     </div>
