@@ -1,3 +1,4 @@
+import browser from "webextension-polyfill";
 import { useState, useEffect } from "preact/hooks";
 import { ExportService } from "../export_conversation/application/ExportService";
 import { Message } from "../core/domain/entities";
@@ -30,10 +31,11 @@ export function PopupApp() {
   const [exporting, setExporting] = useState<ExportType | null>(null);
   const exportService = new ExportService();
 
-  const fetchData = () => {
+  const fetchData = async () => {
     setLoading(true);
     setError(null);
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    try {
+      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
       const tabId = tabs[0]?.id;
       if (!tabId) {
         setError("Pestaña no encontrada.");
@@ -41,23 +43,20 @@ export function PopupApp() {
         return;
       }
 
-      chrome.tabs.sendMessage(tabId, { action: "GET_MESSAGES" }, (response) => {
-        if (chrome.runtime.lastError) {
-          setError(`Connection error. Please, reload the page.`);
-          setLoading(false);
-          return;
-        }
-
-        if (!response) {
-          setError(
-            "No compatible website. Please, contact us if you need support for this website.",
-          );
-        } else {
-          setData(response);
-        }
-        setLoading(false);
-      });
-    });
+      const response = await browser.tabs.sendMessage(tabId, { action: "GET_MESSAGES" });
+      if (!response) {
+        setError(
+          "No compatible website. Please, contact us if you need support for this website.",
+        );
+      } else {
+        setData(response);
+      }
+    } catch (err) {
+      setError(`Connection error. Please, reload the page.`);
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -70,48 +69,50 @@ export function PopupApp() {
         );
       }
     };
-    chrome.runtime.onMessage.addListener(messageListener);
-    return () => chrome.runtime.onMessage.removeListener(messageListener);
+    browser.runtime.onMessage.addListener(messageListener);
+    return () => browser.runtime.onMessage.removeListener(messageListener);
   }, []);
 
-  const toggleSelectionMode = () => {
+  const toggleSelectionMode = async () => {
     if (!data) return;
     const nextMode = !data.selectionModeEnabled;
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    try {
+      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
       const tabId = tabs[0]?.id;
       if (tabId) {
-        chrome.tabs.sendMessage(
+        await browser.tabs.sendMessage(
           tabId,
-          { action: "TOGGLE_SELECTION_MODE", enabled: nextMode },
-          () => {
-            setData({
-              ...data,
-              selectionModeEnabled: nextMode,
-              selectedIds: nextMode ? data.selectedIds : [],
-            });
-          },
+          { action: "TOGGLE_SELECTION_MODE", enabled: nextMode }
         );
+        setData({
+          ...data,
+          selectionModeEnabled: nextMode,
+          selectedIds: nextMode ? data.selectedIds : [],
+        });
       }
-    });
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const handleSelectAll = (select: boolean) => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+  const handleSelectAll = async (select: boolean) => {
+    try {
+      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
       const tabId = tabs[0]?.id;
       if (tabId) {
-        chrome.tabs.sendMessage(
+        const response = await browser.tabs.sendMessage(
           tabId,
-          { action: "SELECT_ALL", select },
-          (response) => {
-            if (response?.selectedIds) {
-              setData((prev) =>
-                prev ? { ...prev, selectedIds: response.selectedIds } : null,
-              );
-            }
-          },
+          { action: "SELECT_ALL", select }
         );
+        if (response?.selectedIds) {
+          setData((prev) =>
+            prev ? { ...prev, selectedIds: response.selectedIds } : null,
+          );
+        }
       }
-    });
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleExport = async (type: ExportType, onlySelected: boolean) => {
@@ -125,18 +126,14 @@ export function PopupApp() {
     }
 
     if (type === "pdf_advanced") {
-      chrome.storage.local.set(
-        {
-          export_preview_data: {
-            messages: messagesToExport,
-            title: data.title,
-          },
+      await browser.storage.local.set({
+        export_preview_data: {
+          messages: messagesToExport,
+          title: data.title,
         },
-        () => {
-          chrome.tabs.create({ url: chrome.runtime.getURL("preview.html") });
-          window.close();
-        },
-      );
+      });
+      browser.tabs.create({ url: browser.runtime.getURL("preview.html") });
+      window.close();
       return;
     }
 

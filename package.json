@@ -5,7 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/prepare-manifest.js",
+    "build:chrome": "vite build && BROWSER=chrome node scripts/prepare-manifest.js",
+    "build:firefox": "vite build && BROWSER=firefox node scripts/prepare-manifest.js",
+    "package:chrome": "npm run build:chrome && npx web-ext build --source-dir dist --artifacts-dir artifacts/chrome --overwrite-dest",
+    "package:firefox": "npm run build:firefox && npx web-ext build --source-dir dist --artifacts-dir artifacts/firefox --overwrite-dest",
+    "package:source": "node scripts/package-source.js",
     "preview": "vite preview"
   },
   "devDependencies": {
@@ -14,6 +19,7 @@
     "@types/html2canvas": "^0.5.35",
     "@types/katex": "^0.16.8",
     "@types/turndown": "^5.0.6",
+    "@types/webextension-polyfill": "^0.12.5",
     "typescript": "^5.0.0",
     "vite": "^5.0.0"
   },
@@ -28,6 +34,7 @@
     "marked": "^11.2.0",
     "mathjax": "^3.2.2",
     "preact": "^10.19.0",
-    "turndown": "^7.2.4"
+    "turndown": "^7.2.4",
+    "webextension-polyfill": "^0.12.0"
   }
 }

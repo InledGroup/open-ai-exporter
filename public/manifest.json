@@ -2,6 +2,8 @@
   "manifest_version": 3,
   "name": "AI Exporter",
   "version": "1.0.5",
+  "author": "Inled Group <hi@inled.es>",
+  "homepage_url": "https://github.com/InledGroup/open-ai-exporter",
   "description": "Export chats from ChatGPT, Claude, Gemini, Perplexity, Kimi y DeepSeek to PDF, MD, TXT, JSON and WORD.",
   "icons": {
     "16": "aiexporter.png",
@@ -9,6 +11,12 @@
     "128": "aiexporter.png"
   },
   "permissions": ["storage", "activeTab", "scripting"],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "aiexporter@inled.es",
+      "strict_min_version": "112.0"
+    }
+  },
   "action": {
     "default_popup": "index.html"
   },

@@ -1,3 +1,4 @@
+import browser from 'webextension-polyfill';
 import { ChatGPTAdapter } from '../export_conversation/infrastructure/adapters/ChatGPTAdapter';
 import { ClaudeAdapter } from '../export_conversation/infrastructure/adapters/ClaudeAdapter';
 import { GeminiAdapter } from '../export_conversation/infrastructure/adapters/GeminiAdapter';
@@ -30,7 +31,7 @@ function scheduleInjection() {
   injectTimer = window.setTimeout(() => {
     activeAdapter?.injectCheckboxes(() => {
       // Notificar al popup si es necesario actualizar la cuenta de seleccionados
-      chrome.runtime.sendMessage({ action: 'SELECTION_CHANGED', selectedIds: activeAdapter?.getSelectedMessageIds() });
+      browser.runtime.sendMessage({ action: 'SELECTION_CHANGED', selectedIds: activeAdapter?.getSelectedMessageIds() });
     });
     injectTimer = null;
   }, 150);
@@ -66,24 +67,21 @@ function init() {
 }
 
 // Escuchar mensajes del Popup
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+browser.runtime.onMessage.addListener(async (request) => {
   if (request.action === 'GET_MESSAGES') {
     if (activeAdapter) {
-      (async () => {
-        try {
-          const messages = await activeAdapter.getMessages();
-          const title = activeAdapter.getConversationTitle();
-          const selectedIds = activeAdapter.getSelectedMessageIds();
-          sendResponse({ messages, title, selectedIds, selectionModeEnabled });
-        } catch (err) {
-          console.error('AI Exporter: Error obteniendo mensajes:', err);
-          sendResponse(null);
-        }
-      })();
+      try {
+        const messages = await activeAdapter.getMessages();
+        const title = activeAdapter.getConversationTitle();
+        const selectedIds = activeAdapter.getSelectedMessageIds();
+        return { messages, title, selectedIds, selectionModeEnabled };
+      } catch (err) {
+        console.error('AI Exporter: Error obteniendo mensajes:', err);
+        return null;
+      }
     } else {
-      sendResponse(null);
+      return null;
     }
-    return true;
   }
 
   if (request.action === 'TOGGLE_SELECTION_MODE') {
@@ -93,14 +91,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else {
       activeAdapter?.removeCheckboxes();
     }
-    sendResponse({ success: true });
-    return true;
+    return { success: true };
   }
 
   if (request.action === 'SELECT_ALL') {
     activeAdapter?.selectAll(request.select);
-    sendResponse({ selectedIds: activeAdapter?.getSelectedMessageIds() });
-    return true;
+    return { selectedIds: activeAdapter?.getSelectedMessageIds() };
   }
 });
 

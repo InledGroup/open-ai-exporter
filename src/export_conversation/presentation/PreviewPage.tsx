@@ -1,3 +1,4 @@
+import browser from "webextension-polyfill";
 import { render } from "preact";
 import { useEffect, useState, useMemo } from "preact/hooks";
 import { marked } from "marked";
@@ -106,7 +107,7 @@ export function PreviewPage() {
   }, []);
 
   useEffect(() => {
-    chrome.storage.local.get(["export_preview_data"], (result) => {
+    browser.storage.local.get(["export_preview_data"]).then((result) => {
       if (result.export_preview_data) {
         setData(result.export_preview_data);
         // Initially all selected
