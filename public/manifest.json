@@ -14,7 +14,7 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "aiexporter@inled.es",
-      "strict_min_version": "112.0"
+      "strict_min_version": "142.0"
     }
   },
   "action": {
