@@ -6,6 +6,7 @@ import { NotebookLMAdapter } from '../export_conversation/infrastructure/adapter
 import { PerplexityAdapter } from '../export_conversation/infrastructure/adapters/PerplexityAdapter';
 import { KimiAdapter } from '../export_conversation/infrastructure/adapters/KimiAdapter';
 import { DeepSeekAdapter } from '../export_conversation/infrastructure/adapters/DeepSeekAdapter';
+import { GoogleAIModeAdapter } from '../export_conversation/infrastructure/adapters/GoogleAIModeAdapter';
 import { IAAdapter } from '../core/domain/IAAdapter';
 import './style.css';
 
@@ -16,7 +17,8 @@ const adapters: IAAdapter[] = [
   new NotebookLMAdapter(),
   new PerplexityAdapter(),
   new KimiAdapter(),
-  new DeepSeekAdapter()
+  new DeepSeekAdapter(),
+  new GoogleAIModeAdapter()
 ];
 
 let activeAdapter: IAAdapter | null = null;
@@ -35,6 +37,15 @@ function scheduleInjection() {
     });
     injectTimer = null;
   }, 150);
+}
+
+function resolveActiveAdapter(): IAAdapter | null {
+  const current = adapters.find(a => a.isCurrentPage()) || null;
+  if (current !== activeAdapter) {
+    activeAdapter?.removeCheckboxes();
+    activeAdapter = current;
+  }
+  return activeAdapter;
 }
 
 function init() {
@@ -67,8 +78,9 @@ function init() {
 }
 
 // Escuchar mensajes del Popup
-browser.runtime.onMessage.addListener(async (request) => {
+browser.runtime.onMessage.addListener(async (request: any) => {
   if (request.action === 'GET_MESSAGES') {
+    resolveActiveAdapter();
     if (activeAdapter) {
       try {
         const messages = await activeAdapter.getMessages();
@@ -85,6 +97,7 @@ browser.runtime.onMessage.addListener(async (request) => {
   }
 
   if (request.action === 'TOGGLE_SELECTION_MODE') {
+    resolveActiveAdapter();
     selectionModeEnabled = request.enabled;
     if (selectionModeEnabled) {
       scheduleInjection();
@@ -95,6 +108,7 @@ browser.runtime.onMessage.addListener(async (request) => {
   }
 
   if (request.action === 'SELECT_ALL') {
+    resolveActiveAdapter();
     activeAdapter?.selectAll(request.select);
     return { selectedIds: activeAdapter?.getSelectedMessageIds() };
   }

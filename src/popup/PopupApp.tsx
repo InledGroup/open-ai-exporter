@@ -7,6 +7,8 @@ import {
   CheckSquare,
   MousePointer2,
   RotateCcw,
+  RefreshCw,
+  XCircle,
   CheckCircle2,
   FileJson,
   FileType,
@@ -15,9 +17,10 @@ import {
   Github,
   Star,
   ExternalLink,
+  AlignLeft,
 } from "lucide-preact";
 
-type ExportType = "md" | "pdf_advanced" | "word" | "json" | "txt";
+type ExportType = "md" | "pdf_advanced" | "word" | "word_basic" | "json" | "txt";
 
 export function PopupApp() {
   const [data, setData] = useState<{
@@ -27,35 +30,144 @@ export function PopupApp() {
     selectionModeEnabled: boolean;
   } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [reloading, setReloading] = useState(false);
+  const [error, setError] = useState<{
+    title: string;
+    hint: string;
+    canReload: boolean;
+  } | null>(null);
   const [exporting, setExporting] = useState<ExportType | null>(null);
+  const [wordMenuOpen, setWordMenuOpen] = useState<"main" | "selection" | null>(null);
   const exportService = new ExportService();
 
-  const fetchData = async () => {
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const requestMessages = (tabId: number) =>
+    browser.tabs.sendMessage(tabId, { action: "GET_MESSAGES" }) as Promise<any>;
+
+  const injectContentScript = async (tabId: number) => {
+    try {
+      await (browser as any).scripting.executeScript({
+        target: { tabId },
+        files: ["loader.js"],
+      });
+      return true;
+    } catch (err) {
+      console.warn("AI Exporter: no se pudo inyectar el content script", err);
+      return false;
+    }
+  };
+
+  const waitForContentScript = async (tabId: number) => {
+    let lastError: unknown = null;
+
+    // El loader importa content.js de forma asíncrona. En webs pesadas como
+    // Gemini el hilo principal puede tardar varios segundos; sondeamos hasta
+    // 15 s y reintentamos la inyección por si el primer loader se perdió.
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      await sleep(attempt === 0 ? 100 : 250);
+      try {
+        return await requestMessages(tabId);
+      } catch (err) {
+        lastError = err;
+      }
+
+      if (attempt === 20 || attempt === 40) {
+        await injectContentScript(tabId);
+      }
+    }
+
+    throw lastError || new Error("Content script timeout");
+  };
+
+  const getMessagesFromTab = async (tabId: number) => {
+    try {
+      // Si ya hay un content script escuchando, responde al momento.
+      return await requestMessages(tabId);
+    } catch {
+      // La pestaña se abrió antes de instalar/actualizar la extensión.
+      await injectContentScript(tabId);
+      return waitForContentScript(tabId);
+    }
+  };
+
+  const fetchData = async (tabIdOverride?: number) => {
     setLoading(true);
     setError(null);
     try {
       const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-      const tabId = tabs[0]?.id;
+      const tabId = tabIdOverride ?? tabs[0]?.id;
       if (!tabId) {
-        setError("Pestaña no encontrada.");
-        setLoading(false);
+        setError({
+          title: "Pestaña no encontrada.",
+          hint: "Abre una conversación y vuelve a intentarlo.",
+          canReload: false,
+        });
         return;
       }
 
-      const response = await browser.tabs.sendMessage(tabId, { action: "GET_MESSAGES" });
+      const response = await getMessagesFromTab(tabId);
+
       if (!response) {
-        setError(
-          "No compatible website. Please, contact us if you need support for this website.",
-        );
+        setError({
+          title: "Esta página no es compatible con AI Exporter.",
+          hint: "Abre una conversación de ChatGPT, Claude, Gemini, NotebookLM, Google AI Mode, DeepSeek, Perplexity o Kimi.",
+          canReload: false,
+        });
       } else {
         setData(response);
       }
     } catch (err) {
-      setError(`Connection error. Please, reload the page.`);
+      setError({
+        title: "No se pudo conectar con la página.",
+        hint: "Recarga la pestaña para que la extensión vuelva a inyectarse y reintenta.",
+        canReload: true,
+      });
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const reloadPage = async () => {
+    try {
+      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+      const tabId = tabs[0]?.id;
+      if (!tabId) return;
+
+      setReloading(true);
+      setError(null);
+      setLoading(true);
+
+      await new Promise<void>((resolve) => {
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          browser.tabs.onUpdated.removeListener(listener);
+          resolve();
+        };
+        const listener = (id: number, info: any) => {
+          if (id === tabId && info.status === "complete") finish();
+        };
+
+        browser.tabs.onUpdated.addListener(listener);
+        browser.tabs.reload(tabId).catch(finish);
+        setTimeout(finish, 15000);
+      });
+
+      await sleep(400);
+      await fetchData(tabId);
+    } catch (err) {
+      console.error(err);
+      setError({
+        title: "No se pudo recargar la pestaña.",
+        hint: "Recárgala manualmente y vuelve a abrir la extensión.",
+        canReload: true,
+      });
+      setLoading(false);
+    } finally {
+      setReloading(false);
     }
   };
 
@@ -103,7 +215,7 @@ export function PopupApp() {
         const response = await browser.tabs.sendMessage(
           tabId,
           { action: "SELECT_ALL", select }
-        );
+        ) as any;
         if (response?.selectedIds) {
           setData((prev) =>
             prev ? { ...prev, selectedIds: response.selectedIds } : null,
@@ -156,8 +268,12 @@ export function PopupApp() {
       } else if (type === "txt") {
         const content = exportService.toText(messagesToExport, data.title);
         exportService.downloadFile(content, `${data.title}.txt`, "text/plain");
-      } else if (type === "word") {
-        const blob = await exportService.toWord(messagesToExport, data.title);
+      } else if (type === "word" || type === "word_basic") {
+        const blob = await exportService.toWord(
+          messagesToExport,
+          data.title,
+          type === "word_basic" ? "basic" : "formatted",
+        );
         exportService.downloadFile(
           blob,
           `${data.title}.docx`,
@@ -183,10 +299,29 @@ export function PopupApp() {
   if (error)
     return (
       <div className="popup-container error-state">
-        <p className="error-text">{error}</p>
-        <button onClick={fetchData} className="btn-retry">
-          <RotateCcw size={14} /> Retry
-        </button>
+        <XCircle size={32} color="#ef4444" />
+        <p className="error-text">{error.title}</p>
+        <p className="error-hint">{error.hint}</p>
+        <div className="error-actions">
+          {error.canReload && (
+            <button
+              onClick={reloadPage}
+              className="btn-reload"
+              disabled={reloading || loading}
+            >
+              <RefreshCw size={14} />
+              {reloading ? "Recargando..." : "Recargar pestaña"}
+            </button>
+          )}
+          <button
+            onClick={() => fetchData()}
+            className="btn-retry"
+            disabled={reloading || loading}
+          >
+            <RotateCcw size={14} />
+            {loading ? "Comprobando..." : "Reintentar"}
+          </button>
+        </div>
       </div>
     );
 
@@ -219,18 +354,42 @@ export function PopupApp() {
             <span className="card-label">PDF</span>
           </button>
 
-          <button
-            onClick={() => handleExport("word", false)}
-            disabled={!!exporting}
-            className="export-card"
-          >
-            {exporting === "word" ? (
-              <div className="spinner-small" />
-            ) : (
-              <FileText size={18} className="card-icon" />
+          <div className="export-card-wrap">
+            <button
+              onClick={() => setWordMenuOpen(wordMenuOpen === "main" ? null : "main")}
+              disabled={!!exporting}
+              className="export-card"
+            >
+              {exporting === "word" || exporting === "word_basic" ? (
+                <div className="spinner-small" />
+              ) : (
+                <FileText size={18} className="card-icon" />
+              )}
+              <span className="card-label">WORD</span>
+            </button>
+            {wordMenuOpen === "main" && (
+              <div className="export-menu">
+                <button
+                  className="export-menu-item"
+                  onClick={() => {
+                    setWordMenuOpen(null);
+                    handleExport("word", false);
+                  }}
+                >
+                  <FileText size={13} /> Formatted (colors)
+                </button>
+                <button
+                  className="export-menu-item"
+                  onClick={() => {
+                    setWordMenuOpen(null);
+                    handleExport("word_basic", false);
+                  }}
+                >
+                  <AlignLeft size={13} /> Basic (plain)
+                </button>
+              </div>
             )}
-            <span className="card-label">WORD</span>
-          </button>
+          </div>
 
           <button
             onClick={() => handleExport("json", false)}
@@ -299,20 +458,44 @@ export function PopupApp() {
                 >
                   <FileCode size={12} /> MD
                 </button>
-                <button
-                  disabled={
-                    !data || data.selectedIds.length === 0 || !!exporting
-                  }
-                  onClick={() => handleExport("word", true)}
-                  className="btn-action primary"
-                >
-                  {exporting === "word" ? (
-                    <div className="spinner-small white" />
-                  ) : (
-                    <FileText size={12} />
-                  )}{" "}
-                  WORD
-                </button>
+                <div className="export-card-wrap">
+                  <button
+                    disabled={
+                      !data || data.selectedIds.length === 0 || !!exporting
+                    }
+                    onClick={() => setWordMenuOpen(wordMenuOpen === "selection" ? null : "selection")}
+                    className="btn-action primary"
+                  >
+                    {exporting === "word" || exporting === "word_basic" ? (
+                      <div className="spinner-small white" />
+                    ) : (
+                      <FileText size={12} />
+                    )}{" "}
+                    WORD
+                  </button>
+                  {wordMenuOpen === "selection" && (
+                    <div className="export-menu">
+                      <button
+                        className="export-menu-item"
+                        onClick={() => {
+                          setWordMenuOpen(null);
+                          handleExport("word", true);
+                        }}
+                      >
+                        <FileText size={13} /> Formatted (colors)
+                      </button>
+                      <button
+                        className="export-menu-item"
+                        onClick={() => {
+                          setWordMenuOpen(null);
+                          handleExport("word_basic", true);
+                        }}
+                      >
+                        <AlignLeft size={13} /> Basic (plain)
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <button
                   disabled={
                     !data || data.selectedIds.length === 0 || !!exporting
@@ -362,7 +545,8 @@ export function PopupApp() {
         }
 
         .popup-container {
-          width: 320px;
+          width: 340px;
+          box-sizing: border-box;
           padding: 20px;
           background: white;
           font-family: 'Inter', -apple-system, sans-serif;
@@ -413,8 +597,50 @@ export function PopupApp() {
         }
 
         .export-grid.mini {
-          grid-template-columns: repeat(3, 1fr);
+          grid-template-columns: repeat(2, 1fr);
           gap: 8px;
+        }
+
+        .export-card-wrap {
+          position: relative;
+        }
+
+        .export-menu {
+          position: absolute;
+          top: calc(100% + 6px);
+          left: 0;
+          right: 0;
+          min-width: 170px;
+          background: white;
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+          padding: 6px;
+          z-index: 2000;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .export-menu-item {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          width: 100%;
+          background: transparent;
+          border: none;
+          border-radius: 7px;
+          padding: 8px 9px;
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--text-dark);
+          cursor: pointer;
+          text-align: left;
+          white-space: nowrap;
+        }
+
+        .export-menu-item:hover {
+          background: #f3f4f6;
         }
 
         .export-card {

@@ -1,122 +1,83 @@
 import { IAAdapter } from '../../../core/domain/IAAdapter';
 import { Message, Role } from '../../../core/domain/entities';
+import { hasMeaningfulContent, sanitizeMessageHtml } from '../../../core/infrastructure/sanitizeHtml';
 
+/**
+ * Extractor de DeepSeek basado en el DOM, igual que la extensión de
+ * referencia. Antes se usaba la API interna, pero depende de userToken,
+ * endpoints y del id de la URL, y por eso no exportaba nada.
+ */
 export class DeepSeekAdapter implements IAAdapter {
   private readonly CHECKBOX_CLASS = 'ai-exporter-checkbox';
 
   isCurrentPage(): boolean {
-    return window.location.hostname.includes('deepseek.com');
+    return window.location.hostname.includes('deepseek.com') ||
+      window.location.hostname.includes('deepseek.ai');
   }
 
-  private getUserToken(): string | null {
-    try {
-      const e = localStorage.getItem("userToken");
-      return e ? JSON.parse(e)?.value || null : null;
-    } catch {
-      return null;
-    }
+  private getMessageElements(): HTMLElement[] {
+    const containers: HTMLElement[] = [];
+    document.querySelectorAll('.ds-message').forEach((message) => {
+      const container = (message.parentElement as HTMLElement) || (message as HTMLElement);
+      if (!containers.includes(container)) containers.push(container);
+    });
+    return containers;
   }
 
-  private extractConversationId(): string {
-    const n = window.location.href.match(/\/a\/chat\/s\/([a-f0-9-]+)/);
-    if (!n) throw new Error("无法从URL中提取 chat_session_id");
-    return n[1];
+  private getRole(el: HTMLElement): Role {
+    return el.classList.contains('ds-markdown') || el.querySelector('.ds-markdown')
+      ? 'assistant'
+      : 'user';
   }
 
-  private normalizeMath(text: string): string {
-    return text
-      .replace(/\\\[([\s\S]*?)\\\]/g, "$$$$ $1 $$$$")
-      .replace(/\\\(([\s\S]*?)\\\)/g, "$ $1 $");
+  private getMessageId(el: HTMLElement, index: number): string {
+    const message = el.querySelector('.ds-message') || el;
+    const id = message.getAttribute('data-message-id') ||
+      message.getAttribute('data-id') ||
+      el.getAttribute('data-message-id') ||
+      el.getAttribute('id');
+    return id || `deepseek-msg-${index}`;
   }
 
   async getMessages(): Promise<Message[]> {
-    const conversationId = this.extractConversationId();
-    const token = this.getUserToken();
-    if (!token) throw new Error("无法获取 userToken，请确保已登录后重试");
+    const elements = this.getMessageElements();
+    const messages: Message[] = [];
 
-    const url = `https://chat.deepseek.com/api/v0/chat/history_messages?chat_session_id=${conversationId}&cache_version=0`;
-    
-    const response = await fetch(url, {
-      method: "GET",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      }
+    elements.forEach((el, index) => {
+      const role = this.getRole(el);
+      const clone = el.cloneNode(true) as HTMLElement;
+
+      // UI y bloques que no forman parte de la respuesta.
+      clone.querySelectorAll(
+        '.ds-think-content, ._7d763a7, ._0a3d93b, ._11d6b3a, .efa13877, ' +
+        `.${this.CHECKBOX_CLASS}`
+      ).forEach(node => node.remove());
+
+      const content = sanitizeMessageHtml(clone.innerHTML, role);
+      if (!hasMeaningfulContent(content)) return;
+
+      messages.push({
+        id: this.getMessageId(el, index),
+        role,
+        content,
+      });
     });
 
-    if (!response.ok) throw new Error(`HTTP请求失败: ${response.status}`);
-    const data = await response.json();
-
-    return this.convertResponseToMessages(data, conversationId);
-  }
-
-  private convertResponseToMessages(e: any, n: string): Message[] {
-    const r: Message[] = [];
-    const i = e.data?.biz_data?.chat_messages || [];
-    const o = e.data?.biz_data?.chat_session;
-    const u = new Map();
-    
-    for (const p of i) u.set(p.message_id, p);
-    
-    const l = o?.current_message_id;
-    if (l == null) return r;
-    
-    const c: any[] = [];
-    let f = l;
-    while (f !== null) {
-      const p = u.get(f);
-      if (!p) break;
-      c.push(p);
-      f = p.parent_id;
-    }
-    c.reverse();
-
-    for (const p of c) {
-      if (p.status !== "FINISHED") continue;
-      const role: Role = p.role === "USER" ? "user" : "assistant";
-      let content = p.content || "";
-      
-      // Manejar contenido de razonamiento (thinking) con una estructura HTML estirable
-      if (p.thinking_content && p.thinking_content.trim()) {
-        const thinkingContent = this.normalizeMath(p.thinking_content.trim());
-        const thinkingHtml = `<div class="thinking-section">
-          <div class="thinking-header">Reasoning Process</div>
-          <div class="thinking-content">${thinkingContent}</div>
-        </div>`;
-        content = `${thinkingHtml}\n\n${content}`;
-      }
-
-      if (p.files && p.files.length > 0) {
-        const filesInfo = p.files.map((s: any) => `[文件: ${s.file_name}]`).join('\n');
-        content = `${filesInfo}\n\n${content}`;
-      }
-
-      r.push({
-        id: `${n}_${p.message_id}`,
-        role,
-        content: this.normalizeMath(content.trim())
-      });
-    }
-    return r;
+    return messages;
   }
 
   injectCheckboxes(onSelectionChange: (selectedIds: string[]) => void): void {
-    // Usamos el selector encontrado en el código fuente para inyectar en la barra de acciones
-    const elements = document.querySelectorAll('._965abe9, .ds-flex.ds-flex-col.ds-gap-4');
-    elements.forEach((el, index) => {
+    this.getMessageElements().forEach((el, index) => {
       if (el.querySelector(`.${this.CHECKBOX_CLASS}`)) return;
 
-      const container = el as HTMLElement;
-      container.style.position = 'relative';
+      if (window.getComputedStyle(el).position === 'static') {
+        el.style.position = 'relative';
+      }
 
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.className = this.CHECKBOX_CLASS;
-      // El ID aquí debe coincidir con el ID generado en getMessages si es posible, 
-      // pero como getMessages es dinámico y asíncrono, usaremos un ID basado en el índice 
-      // o buscaremos el ID del mensaje en el DOM si DeepSeek lo expone.
-      checkbox.dataset.id = `deepseek-msg-${index}`;
+      checkbox.dataset.id = this.getMessageId(el, index);
       checkbox.style.cssText = `
         position: absolute;
         left: -30px;
@@ -131,7 +92,7 @@ export class DeepSeekAdapter implements IAAdapter {
         onSelectionChange(this.getSelectedMessageIds());
       });
 
-      container.prepend(checkbox);
+      el.prepend(checkbox);
     });
   }
 
@@ -140,20 +101,20 @@ export class DeepSeekAdapter implements IAAdapter {
   }
 
   selectAll(select: boolean): void {
-    const checkboxes = document.querySelectorAll(`input.${this.CHECKBOX_CLASS}`);
-    checkboxes.forEach(cb => {
+    document.querySelectorAll(`input.${this.CHECKBOX_CLASS}`).forEach(cb => {
       (cb as HTMLInputElement).checked = select;
     });
   }
 
   getSelectedMessageIds(): string[] {
-    const checkboxes = document.querySelectorAll(`.${this.CHECKBOX_CLASS}:checked`);
-    return Array.from(checkboxes).map(cb => (cb as HTMLInputElement).dataset.id || '');
+    return Array.from(document.querySelectorAll(`input.${this.CHECKBOX_CLASS}:checked`))
+      .map(cb => (cb as HTMLInputElement).dataset.id || '')
+      .filter(Boolean);
   }
 
   getConversationTitle(): string {
-    const titleEl = document.querySelector('.ds-flex.ds-items-center.ds-overflow-hidden.ds-text-ellipsis') || 
-                    document.querySelector('title');
-    return titleEl?.textContent?.trim() || 'DeepSeek Conversation';
+    const titleEl = document.querySelector('.b64fb9ae') ||
+      document.querySelector('.ds-flex.ds-items-center.ds-overflow-hidden.ds-text-ellipsis');
+    return titleEl?.textContent?.trim() || document.title || 'DeepSeek Conversation';
   }
 }

@@ -2,20 +2,25 @@ import TurndownService from 'turndown';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import html2pdf from 'html2pdf.js';
-import { 
-  Document, 
-  Packer, 
-  Paragraph, 
-  TextRun, 
-  HeadingLevel, 
+import {
+  Document,
+  Packer,
+  Paragraph,
+  TextRun,
+  HeadingLevel,
   AlignmentType,
   BorderStyle,
   Table,
   TableRow,
   TableCell,
-  WidthType
+  WidthType,
+  ImageRun
 } from 'docx';
 import { Message } from '../../core/domain/entities';
+
+export type WordStyle = 'formatted' | 'basic';
+
+type DocxImageType = 'png' | 'jpg' | 'gif' | 'bmp' | 'svg';
 
 export class ExportService {
   private turndown = new TurndownService({
@@ -48,7 +53,7 @@ export class ExportService {
     return JSON.stringify(messages, null, 2);
   }
 
-  async toWord(messages: Message[], title: string): Promise<Blob> {
+  async toWord(messages: Message[], title: string, style: WordStyle = 'formatted'): Promise<Blob> {
     const docChildren: any[] = [
       new Paragraph({
         text: title,
@@ -58,122 +63,27 @@ export class ExportService {
       })
     ];
 
-    messages.forEach(msg => {
+    for (const msg of messages) {
       const isUser = msg.role === 'user';
       const roleName = isUser ? 'You' : 'AI Assistant';
       const roleColor = isUser ? '2563eb' : '3ac200';
-      const bgColor = isUser ? 'F9FAFB' : 'F0FDF4'; 
+      const bgColor = isUser ? 'F9FAFB' : 'F0FDF4';
       const borderColor = isUser ? 'E5E7EB' : 'DCFCE7';
 
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = msg.content;
-      
-      const contentParagraphs: Paragraph[] = [];
-      
-      const processNodes = (nodes: NodeList, styles: any = {}): any[] => {
-        let results: any[] = [];
-        nodes.forEach(node => {
-          if (node.nodeType === Node.TEXT_NODE) {
-            const text = node.textContent || '';
-            if (text.trim()) {
-              if (text.includes('$')) {
-                const parts = text.split(/(\$\$?.*?\$\$?)/g);
-                parts.forEach(part => {
-                  if (!part) return;
-                  const isMath = part.startsWith('$');
-                  results.push(new TextRun({
-                    text: part,
-                    size: 24,
-                    italics: isMath,
-                    font: isMath ? 'Cambria Math' : undefined,
-                    ...styles
-                  }));
-                });
-              } else {
-                results.push(new TextRun({
-                  text,
-                  size: 24,
-                  ...styles
-                }));
-              }
-            }
-          } else if (node.nodeType === Node.ELEMENT_NODE) {
-            const el = node as HTMLElement;
-            const newStyles = { ...styles };
-            
-            if (el.classList.contains('katex-mathml') || el.tagName === 'ANNOTATION') return;
-            if (el.classList.contains('katex-html')) {
-              results.push(...processNodes(el.childNodes, { ...newStyles, italics: true, font: 'Cambria Math' }));
-              return;
-            }
+      const contentParagraphs = await this.buildContentParagraphs(msg.content);
 
-            if (['B', 'STRONG'].includes(el.tagName)) newStyles.bold = true;
-            if (['I', 'EM'].includes(el.tagName)) newStyles.italics = true;
-            if (['CODE'].includes(el.tagName)) {
-              newStyles.font = 'Courier New';
-              newStyles.shading = { fill: 'F3F4F6' };
-              newStyles.size = 22;
-            }
-
-            if (['P', 'DIV', 'SECTION', 'ARTICLE', 'BLOCKQUOTE', 'PRE', 'UL', 'OL'].includes(el.tagName)) {
-              // If there are current pending inline results, wrap them
-              if (results.length > 0) {
-                contentParagraphs.push(new Paragraph({ children: results, spacing: { after: 120 } }));
-                results = [];
-              }
-
-              if (el.tagName === 'PRE') {
-                contentParagraphs.push(new Paragraph({
-                  children: [new TextRun({ text: el.innerText.trim(), font: 'Courier New', size: 20 })],
-                  spacing: { before: 120, after: 120 },
-                  shading: { fill: 'F8FAFC' },
-                  border: {
-                    top: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
-                    bottom: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
-                    left: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
-                    right: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
-                  }
-                }));
-              } else if (['UL', 'OL'].includes(el.tagName)) {
-                el.querySelectorAll('li').forEach(li => {
-                  const liInline = processNodes(li.childNodes, newStyles);
-                  if (liInline.length > 0) {
-                    contentParagraphs.push(new Paragraph({
-                      children: liInline,
-                      bullet: { level: 0 },
-                      spacing: { after: 80 },
-                    }));
-                  }
-                });
-              } else {
-                const innerInline = processNodes(el.childNodes, newStyles);
-                if (innerInline.length > 0) {
-                  contentParagraphs.push(new Paragraph({ 
-                    children: innerInline, 
-                    spacing: { after: 120 },
-                    indent: el.tagName === 'BLOCKQUOTE' ? { left: 400 } : undefined,
-                    border: el.tagName === 'BLOCKQUOTE' ? { 
-                      left: { style: BorderStyle.SINGLE, size: 20, color: 'D1D5DB', space: 10 } 
-                    } : undefined
-                  }));
-                }
-              }
-            } else if (el.tagName === 'BR') {
-              results.push(new TextRun({ break: 1 }));
-            } else {
-              results.push(...processNodes(el.childNodes, newStyles));
-            }
-          }
-        });
-        return results;
-      };
-
-      const finalInline = processNodes(tempDiv.childNodes);
-      if (finalInline.length > 0) {
-        contentParagraphs.push(new Paragraph({ children: finalInline, spacing: { after: 120 } }));
+      if (style === 'basic') {
+        // Formato básico: "You"/"AI Assistant" en negrita, mensaje y punto y aparte.
+        docChildren.push(new Paragraph({
+          children: [new TextRun({ text: roleName, bold: true, size: 28 })],
+          spacing: { before: 240, after: 120 },
+        }));
+        docChildren.push(...contentParagraphs);
+        docChildren.push(new Paragraph({ text: '', spacing: { after: 240 } }));
+        continue;
       }
 
-      // Add the message bubble as a Table
+      // Formato bonito: burbuja con color e identificación del rol.
       docChildren.push(new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
         rows: [
@@ -210,7 +120,7 @@ export class ExportService {
 
       // Add a spacer between bubbles
       docChildren.push(new Paragraph({ text: '', spacing: { before: 200 } }));
-    });
+    }
 
     const doc = new Document({
       sections: [{
@@ -222,22 +132,224 @@ export class ExportService {
     return await Packer.toBlob(doc);
   }
 
+  /**
+   * Convierte el HTML de un mensaje en párrafos de Word.
+   * Las imágenes se descargan y se incrustan; si no se pueden descargar se
+   * conserva su texto alternativo para no perder la referencia.
+   */
+  private async buildContentParagraphs(html: string): Promise<Paragraph[]> {
+    const contentParagraphs: Paragraph[] = [];
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+
+    const processNodes = async (nodes: ArrayLike<ChildNode>, styles: any = {}): Promise<any[]> => {
+      let results: any[] = [];
+
+      for (const node of Array.from(nodes)) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          const text = node.textContent || '';
+          if (!text.trim()) continue;
+
+          if (text.includes('$')) {
+            const parts = text.split(/(\$\$?.*?\$\$?)/g);
+            parts.forEach(part => {
+              if (!part) return;
+              const isMath = part.startsWith('$');
+              results.push(new TextRun({
+                text: part,
+                size: 24,
+                italics: isMath,
+                font: isMath ? 'Cambria Math' : undefined,
+                ...styles
+              }));
+            });
+          } else {
+            results.push(new TextRun({
+              text,
+              size: 24,
+              ...styles
+            }));
+          }
+          continue;
+        }
+
+        if (node.nodeType !== Node.ELEMENT_NODE) continue;
+
+        const el = node as HTMLElement;
+
+        if (el.classList.contains('katex-mathml') || el.tagName === 'ANNOTATION') continue;
+        if (el.classList.contains('katex-html')) {
+          results.push(...await processNodes(el.childNodes, { ...styles, italics: true, font: 'Cambria Math' }));
+          continue;
+        }
+
+        if (el.tagName === 'IMG') {
+          const src = el.getAttribute('src') || '';
+          const alt = el.getAttribute('alt') || 'Image';
+          const imageRun = await this.createImageRun(src);
+          if (imageRun) {
+            results.push(imageRun);
+          } else {
+            results.push(new TextRun({ text: `[${alt}]`, size: 22, italics: true }));
+          }
+          continue;
+        }
+
+        const newStyles = { ...styles };
+
+        if (['B', 'STRONG'].includes(el.tagName)) newStyles.bold = true;
+        if (['I', 'EM'].includes(el.tagName)) newStyles.italics = true;
+        if (['CODE'].includes(el.tagName)) {
+          newStyles.font = 'Courier New';
+          newStyles.shading = { fill: 'F3F4F6' };
+          newStyles.size = 22;
+        }
+
+        if (['P', 'DIV', 'SECTION', 'ARTICLE', 'BLOCKQUOTE', 'PRE', 'UL', 'OL'].includes(el.tagName)) {
+          // If there are current pending inline results, wrap them
+          if (results.length > 0) {
+            contentParagraphs.push(new Paragraph({ children: results, spacing: { after: 120 } }));
+            results = [];
+          }
+
+          if (el.tagName === 'PRE') {
+            contentParagraphs.push(new Paragraph({
+              children: [new TextRun({ text: el.innerText.trim(), font: 'Courier New', size: 20 })],
+              spacing: { before: 120, after: 120 },
+              shading: { fill: 'F8FAFC' },
+              border: {
+                top: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
+                bottom: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
+                left: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
+                right: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
+              }
+            }));
+          } else if (['UL', 'OL'].includes(el.tagName)) {
+            for (const li of Array.from(el.querySelectorAll('li'))) {
+              const liInline = await processNodes(li.childNodes, newStyles);
+              if (liInline.length > 0) {
+                contentParagraphs.push(new Paragraph({
+                  children: liInline,
+                  bullet: { level: 0 },
+                  spacing: { after: 80 },
+                }));
+              }
+            }
+          } else {
+            const innerInline = await processNodes(el.childNodes, newStyles);
+            if (innerInline.length > 0) {
+              contentParagraphs.push(new Paragraph({
+                children: innerInline,
+                spacing: { after: 120 },
+                indent: el.tagName === 'BLOCKQUOTE' ? { left: 400 } : undefined,
+                border: el.tagName === 'BLOCKQUOTE' ? {
+                  left: { style: BorderStyle.SINGLE, size: 20, color: 'D1D5DB', space: 10 }
+                } : undefined
+              }));
+            }
+          }
+        } else if (el.tagName === 'BR') {
+          results.push(new TextRun({ break: 1 }));
+        } else {
+          results.push(...await processNodes(el.childNodes, newStyles));
+        }
+      }
+
+      return results;
+    };
+
+    const finalInline = await processNodes(tempDiv.childNodes);
+    if (finalInline.length > 0) {
+      contentParagraphs.push(new Paragraph({ children: finalInline, spacing: { after: 120 } }));
+    }
+
+    if (contentParagraphs.length === 0 && tempDiv.textContent?.trim()) {
+      contentParagraphs.push(new Paragraph({ text: tempDiv.textContent.trim(), spacing: { after: 120 } }));
+    }
+
+    return contentParagraphs;
+  }
+
+  private async createImageRun(src: string): Promise<ImageRun | null> {
+    if (!src) return null;
+
+    try {
+      const response = await fetch(src, { credentials: 'omit' });
+      if (!response.ok) return null;
+
+      const blob = await response.blob();
+      const type = this.getDocxImageType(blob.type, src);
+      if (!type) return null;
+
+      const data = new Uint8Array(await blob.arrayBuffer());
+      const dimensions = await this.getImageDimensions(blob);
+      const maxWidth = 460;
+      const scale = dimensions.width > 0 ? Math.min(1, maxWidth / dimensions.width) : 1;
+
+      return new ImageRun({
+        data,
+        type,
+        transformation: {
+          width: Math.max(1, Math.round(dimensions.width * scale)),
+          height: Math.max(1, Math.round(dimensions.height * scale)),
+        },
+      } as any);
+    } catch (err) {
+      console.warn('AI Exporter: no se pudo incrustar una imagen en Word', err);
+      return null;
+    }
+  }
+
+  private getDocxImageType(mime: string, src: string): DocxImageType | null {
+    const value = (mime || '').toLowerCase();
+    if (value.includes('jpeg') || value.includes('jpg')) return 'jpg';
+    if (value.includes('png')) return 'png';
+    if (value.includes('gif')) return 'gif';
+    if (value.includes('bmp')) return 'bmp';
+    if (value.includes('svg')) return 'svg';
+
+    const extension = src.split('?')[0].split('.').pop()?.toLowerCase();
+    if (extension === 'jpg' || extension === 'jpeg') return 'jpg';
+    if (extension === 'png') return 'png';
+    if (extension === 'gif') return 'gif';
+    if (extension === 'bmp') return 'bmp';
+    if (extension === 'svg') return 'svg';
+
+    return null;
+  }
+
+  private getImageDimensions(blob: Blob): Promise<{ width: number; height: number }> {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(blob);
+      const image = new Image();
+
+      const cleanup = (width: number, height: number) => {
+        URL.revokeObjectURL(url);
+        resolve({ width, height });
+      };
+
+      image.onload = () => cleanup(image.naturalWidth || 400, image.naturalHeight || 300);
+      image.onerror = () => cleanup(400, 300);
+      image.src = url;
+    });
+  }
+
   async exportToPdfWithCanvas(containerId: string, filename: string) {
     const element = document.getElementById(containerId);
     if (!element) return;
 
     const opt = {
-      margin: [15, 15], // More breathing room
+      margin: [15, 15] as [number, number], // More breathing room
       filename: filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { 
-        scale: 2, 
-        useCORS: true, 
+      image: { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
         letterRendering: true,
         logging: false,
         backgroundColor: '#ffffff'
       },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const },
       pagebreak: { mode: 'css' } // Rely on the CSS rules I just added
     };
 
@@ -255,7 +367,14 @@ export class ExportService {
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
+    a.style.display = 'none';
+
+    // El enlace debe estar en el documento para que Chrome inicie la descarga.
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
+
+    // Revocar demasiado pronto puede cancelar la descarga.
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 }

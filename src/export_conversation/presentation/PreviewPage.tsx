@@ -5,7 +5,7 @@ import { marked } from "marked";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import renderMathInElement from "katex/dist/contrib/auto-render.mjs";
-import { ExportService } from "../application/ExportService";
+import { ExportService, type WordStyle } from "../application/ExportService";
 import { Message } from "../../core/domain/entities";
 import {
   Download,
@@ -23,6 +23,7 @@ import {
   FileCode,
   FileOutput,
   Menu,
+  AlignLeft,
 } from "lucide-preact";
 
 export function PreviewPage() {
@@ -34,6 +35,7 @@ export function PreviewPage() {
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [openExportMenu, setOpenExportMenu] = useState<"word" | "pdf" | null>(null);
 
   // New customization state
   const [fontSize, setFontSize] = useState(15);
@@ -109,11 +111,11 @@ export function PreviewPage() {
   }, []);
 
   useEffect(() => {
-    browser.storage.local.get(["export_preview_data"]).then((result) => {
+    browser.storage.local.get(["export_preview_data"]).then((result: any) => {
       if (result.export_preview_data) {
         setData(result.export_preview_data);
         // Initially all selected
-        const ids = new Set(
+        const ids = new Set<string>(
           result.export_preview_data.messages.map((m: Message) => m.id),
         );
         setSelectedIds(ids);
@@ -145,7 +147,7 @@ export function PreviewPage() {
     return data.messages.filter((m) => selectedIds.has(m.id));
   };
 
-  const handleDownloadPdf = async () => {
+  const handleDownloadPdf = async (style: "conversation" | "flat" = "conversation") => {
     if (!data) return;
     setStatus("generating");
     setIsMenuOpen(false);
@@ -154,7 +156,11 @@ export function PreviewPage() {
     const wasSelectionMode = isSelectionMode;
     setIsSelectionMode(false);
     const mainWrapper = document.querySelector(".preview-container");
+    const pdfContent = document.getElementById("preview-content");
     if (mainWrapper) mainWrapper.classList.add("exporting-pdf");
+    // El class debe ir también en el elemento que captura html2canvas;
+    // si sólo está en un ancestro, el clon del PDF no hereda los estilos.
+    if (pdfContent) pdfContent.classList.toggle("pdf-flat", style === "flat");
 
     // Wait a bit for the UI to update
     setTimeout(async () => {
@@ -164,15 +170,16 @@ export function PreviewPage() {
           `${data.title}.pdf`,
         );
         setStatus("done");
-        if (mainWrapper) mainWrapper.classList.remove("exporting-pdf");
         setIsSelectionMode(wasSelectionMode);
         setTimeout(() => setStatus("idle"), 3000);
       } catch (err) {
         console.error(err);
-        if (mainWrapper) mainWrapper.classList.remove("exporting-pdf");
         setStatus("idle");
         setIsSelectionMode(wasSelectionMode);
         alert("Error generating PDF");
+      } finally {
+        if (mainWrapper) mainWrapper.classList.remove("exporting-pdf");
+        if (pdfContent) pdfContent.classList.remove("pdf-flat");
       }
     }, 800);
   };
@@ -201,13 +208,13 @@ export function PreviewPage() {
     exportService.downloadFile(txt, `${data.title}.txt`, "text/plain");
   };
 
-  const handleDownloadWord = async () => {
+  const handleDownloadWord = async (style: WordStyle = "formatted") => {
     if (!data) return;
     setStatus("generating");
     setIsMenuOpen(false);
     try {
       const messagesToExport = getMessagesToExport();
-      const blob = await exportService.toWord(messagesToExport, data.title);
+      const blob = await exportService.toWord(messagesToExport, data.title, style);
       exportService.downloadFile(
         blob,
         `${data.title}.docx`,
@@ -329,31 +336,79 @@ export function PreviewPage() {
           <div className="divider" />
 
           <div className="export-buttons-group">
-            <button
-              onClick={handleDownloadWord}
-              disabled={status === "generating"}
-              className="btn-primary"
-            >
-              {status === "generating" ? (
-                <div class="spinner"></div>
-              ) : (
-                <FileText size={18} />
+            <div className="export-dropdown-wrap">
+              <button
+                onClick={() => setOpenExportMenu(openExportMenu === "word" ? null : "word")}
+                disabled={status === "generating"}
+                className="btn-primary"
+              >
+                {status === "generating" ? (
+                  <div class="spinner"></div>
+                ) : (
+                  <FileText size={18} />
+                )}
+                {status === "generating" ? "..." : "Word"}
+              </button>
+              {openExportMenu === "word" && (
+                <div className="export-dropdown-menu">
+                  <button
+                    className="export-dropdown-item"
+                    onClick={() => {
+                      setOpenExportMenu(null);
+                      handleDownloadWord("formatted");
+                    }}
+                  >
+                    <FileText size={15} /> Formatted (colors)
+                  </button>
+                  <button
+                    className="export-dropdown-item"
+                    onClick={() => {
+                      setOpenExportMenu(null);
+                      handleDownloadWord("basic");
+                    }}
+                  >
+                    <AlignLeft size={15} /> Basic (plain)
+                  </button>
+                </div>
               )}
-              {status === "generating" ? "..." : "Word"}
-            </button>
+            </div>
 
-            <button
-              onClick={handleDownloadPdf}
-              disabled={status === "generating"}
-              className="btn-primary"
-            >
-              {status === "generating" ? (
-                <div class="spinner"></div>
-              ) : (
-                <FileOutput size={18} />
+            <div className="export-dropdown-wrap">
+              <button
+                onClick={() => setOpenExportMenu(openExportMenu === "pdf" ? null : "pdf")}
+                disabled={status === "generating"}
+                className="btn-primary"
+              >
+                {status === "generating" ? (
+                  <div class="spinner"></div>
+                ) : (
+                  <FileOutput size={18} />
+                )}
+                {status === "generating" ? "..." : "PDF"}
+              </button>
+              {openExportMenu === "pdf" && (
+                <div className="export-dropdown-menu">
+                  <button
+                    className="export-dropdown-item"
+                    onClick={() => {
+                      setOpenExportMenu(null);
+                      handleDownloadPdf("conversation");
+                    }}
+                  >
+                    <FileOutput size={15} /> Conversation design
+                  </button>
+                  <button
+                    className="export-dropdown-item"
+                    onClick={() => {
+                      setOpenExportMenu(null);
+                      handleDownloadPdf("flat");
+                    }}
+                  >
+                    <AlignLeft size={15} /> Flat design
+                  </button>
+                </div>
               )}
-              {status === "generating" ? "..." : "PDF"}
-            </button>
+            </div>
 
             <button onClick={handleDownloadMarkdown} className="btn-primary">
               <FileCode size={18} />
@@ -550,6 +605,47 @@ export function PreviewPage() {
           align-items: center;
         }
 
+        .export-dropdown-wrap {
+          position: relative;
+        }
+
+        .export-dropdown-menu {
+          position: absolute;
+          top: calc(100% + 6px);
+          right: 0;
+          min-width: 210px;
+          background: white;
+          border: 1px solid var(--border-color);
+          border-radius: 10px;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+          padding: 6px;
+          z-index: 2000;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .export-dropdown-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          width: 100%;
+          text-align: left;
+          background: transparent;
+          border: none;
+          border-radius: 7px;
+          padding: 9px 10px;
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--text-main);
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .export-dropdown-item:hover {
+          background: #f3f4f6;
+        }
+
         .btn-primary {
           background: var(--primary-color);
           color: white;
@@ -672,6 +768,49 @@ export function PreviewPage() {
           box-shadow: none !important;
           padding: 40px !important;
           border-radius: 0 !important;
+        }
+
+        /* Diseño plano: sin burbujas ni avatares, pensado para lectura e impresión */
+        .pdf-flat .preview-content-area {
+          box-shadow: none !important;
+          border-radius: 0 !important;
+        }
+
+        .pdf-flat .content-header {
+          text-align: left;
+          margin-bottom: 30px;
+        }
+
+        .pdf-flat .avatar {
+          display: none !important;
+        }
+
+        .pdf-flat .message-row {
+          display: block;
+          margin-bottom: 22px;
+        }
+
+        .pdf-flat .message-wrapper,
+        .pdf-flat .user-row .message-wrapper,
+        .pdf-flat .ai-row .message-wrapper {
+          max-width: 100%;
+          align-items: flex-start;
+        }
+
+        .pdf-flat .role-name {
+          text-transform: none;
+          font-size: 13px;
+          font-weight: 700;
+          color: #111827;
+          margin-bottom: 6px;
+        }
+
+        .pdf-flat .bubble {
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          border-radius: 0 !important;
+          padding: 0 !important;
         }
 
         .content-header {

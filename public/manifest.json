@@ -4,7 +4,7 @@
   "version": "1.0.5",
   "author": "Inled Group <hi@inled.es>",
   "homepage_url": "https://github.com/InledGroup/open-ai-exporter",
-  "description": "Export chats from ChatGPT, Claude, Gemini, Perplexity, Kimi y DeepSeek to PDF, MD, TXT, JSON and WORD.",
+  "description": "Export chats from ChatGPT, Claude, Gemini, NotebookLM, Google AI Mode, Perplexity, Kimi and DeepSeek to PDF, MD, TXT, JSON and WORD.",
   "icons": {
     "16": "aiexporter.png",
     "48": "aiexporter.png",
@@ -32,13 +32,17 @@
         "*://claude.ai/*",
         "*://gemini.google.com/*",
         "*://aistudio.google.com/*",
+        "*://notebook.google.com/*",
         "*://notebooklm.google.com/*",
         "*://*.perplexity.ai/*",
         "*://*.kimi.com/*",
         "*://kimi.com/*",
         "*://kimi.moonshot.cn/*",
         "*://chat.deepseek.com/*",
-        "*://*.deepseek.com/*"
+        "*://*.deepseek.com/*",
+        "*://www.google.com/search*",
+        "*://www.google.com.hk/search*",
+        "*://www.google.co.uk/search*"
       ],
       "js": ["loader.js"],
       "css": ["content.css"],
@@ -51,12 +55,17 @@
     "*://claude.ai/*",
     "*://gemini.google.com/*",
     "*://aistudio.google.com/*",
+    "*://notebook.google.com/*",
     "*://notebooklm.google.com/*",
     "*://*.perplexity.ai/*",
     "*://kimi.ai/*",
     "*://kimi.moonshot.cn/*",
     "*://chat.deepseek.com/*",
-    "*://*.deepseek.com/*"
+    "*://*.deepseek.com/*",
+    "*://www.google.com/search*",
+    "*://www.google.com.hk/search*",
+    "*://www.google.co.uk/search*",
+    "<all_urls>"
   ],
   "web_accessible_resources": [
     {

@@ -3,6 +3,7 @@ import { Message, Role } from "../../../core/domain/entities";
 
 export class KimiAdapter implements IAAdapter {
   private readonly CHECKBOX_CLASS = "ai-exporter-checkbox";
+  private renderedIds: string[] = [];
   private readonly DEFAULT_LIST_MESSAGES_URL =
     "https://kimi.com/apiv2/kimi.gateway.chat.v1.ChatService/ListMessages";
 
@@ -57,7 +58,9 @@ export class KimiAdapter implements IAAdapter {
       throw new Error(`Kimi API request failed: ${response.status}`);
     const data = await response.json();
 
-    return this.convertToMessages(data, chat_id);
+    const messages = this.convertToMessages(data, chat_id);
+    this.renderedIds = messages.map(message => message.id);
+    return messages;
   }
 
   private buildRefMap(blocks: any[], refs: any): Map<string, any> {
@@ -139,7 +142,7 @@ export class KimiAdapter implements IAAdapter {
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
       checkbox.className = this.CHECKBOX_CLASS;
-      checkbox.dataset.id = `kimi-msg-${index}`;
+      checkbox.dataset.id = this.renderedIds[index] || `kimi-msg-${index}`;
       checkbox.style.cssText = `
         position: absolute;
         left: -30px;

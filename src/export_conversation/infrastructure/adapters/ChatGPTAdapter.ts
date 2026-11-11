@@ -1,10 +1,93 @@
 import { IAAdapter } from '../../../core/domain/IAAdapter';
 import { Message, Role } from '../../../core/domain/entities';
+import { hasMeaningfulContent, sanitizeMessageHtml } from '../../../core/infrastructure/sanitizeHtml';
 
 export class ChatGPTAdapter implements IAAdapter {
   private readonly CHECKBOX_CLASS = 'ai-exporter-checkbox';
-  // Selector primario basado en el HTML real analizado
-  private readonly MESSAGE_SELECTOR = '[data-message-id]';
+
+  private getMessageElements(): HTMLElement[] {
+    // DOM actual (2026): cada mensaje lleva data-conversation-role en su
+    // encabezado accesible, dentro de un bloque de turno.
+    const current = Array.from(
+      document.querySelectorAll('[data-conversation-role="user"], [data-conversation-role="assistant"]')
+    ) as HTMLElement[];
+    if (current.length > 0) return current;
+
+    // Selector de la extensión de referencia (versiones anteriores).
+    const reference = Array.from(
+      document.querySelectorAll('main article > div.text-base > div')
+    ) as HTMLElement[];
+    if (reference.length > 0) return reference;
+
+    return Array.from(
+      document.querySelectorAll('article[data-turn], [data-message-id]')
+    ) as HTMLElement[];
+  }
+
+  private getRole(el: HTMLElement): Role {
+    const attr = el.getAttribute('data-conversation-role');
+    if (attr === 'user' || attr === 'assistant') return attr;
+
+    const article = el.closest('article');
+    if (article) {
+      for (const label of Array.from(article.querySelectorAll('.sr-only'))) {
+        const text = (label.textContent || '').toLowerCase();
+        if (text.includes('chatgpt') || text.includes('assistant')) return 'assistant';
+        if (text.includes('you said') || text.includes('you wrote')) return 'user';
+      }
+    }
+
+    const directRole = el.getAttribute('data-message-author-role') ||
+      el.closest('[data-message-author-role]')?.getAttribute('data-message-author-role');
+    if (directRole === 'user' || directRole === 'assistant') return directRole;
+
+    const turn = el.getAttribute('data-turn') ||
+      el.closest('[data-turn]')?.getAttribute('data-turn');
+    if (turn === 'user' || turn === 'assistant') return turn;
+
+    return el.querySelector('.markdown, .prose') ? 'assistant' : 'user';
+  }
+
+  private getContentElement(el: HTMLElement): HTMLElement {
+    if (el.getAttribute('data-conversation-role') === 'user') {
+      return (el.parentElement?.querySelector('[data-user-message-bubble="true"]') as HTMLElement) ||
+        (el.parentElement as HTMLElement) ||
+        el;
+    }
+
+    const unit = el.closest('[data-content-search-unit-key]');
+    if (unit) return unit as HTMLElement;
+
+    // Compatibilidad con el DOM anterior.
+    return (el.parentElement as HTMLElement) || el;
+  }
+
+  private getMessageId(el: HTMLElement, index: number): string {
+    const content = this.getContentElement(el);
+    const selectionId = content.querySelector('[data-chatgpt-selection-message-id]')
+      ?.getAttribute('data-chatgpt-selection-message-id');
+    if (selectionId) return selectionId;
+
+    const searchIds = content.getAttribute('data-chatgpt-search-message-ids') ||
+      el.parentElement?.querySelector('[data-chatgpt-search-message-ids]')
+        ?.getAttribute('data-chatgpt-search-message-ids') ||
+      el.getAttribute('data-chatgpt-search-message-ids');
+    if (searchIds) {
+      const first = searchIds.trim().split(/\s+/)[0];
+      if (first) return first;
+    }
+
+    const unitKey = content.getAttribute('data-content-search-unit-key');
+    if (unitKey) return unitKey;
+
+    const turnKey = el.closest('[data-turn-key]')?.getAttribute('data-turn-key') ||
+      content.getAttribute('data-turn-key') ||
+      el.getAttribute('data-turn-key') ||
+      el.closest('[data-turn-id]')?.getAttribute('data-turn-id');
+    if (turnKey) return `${turnKey}-${this.getRole(el)}`;
+
+    return `chatgpt-msg-${index}`;
+  }
 
   isCurrentPage(): boolean {
     const host = window.location.hostname;
@@ -12,44 +95,33 @@ export class ChatGPTAdapter implements IAAdapter {
   }
 
   async getMessages(): Promise<Message[]> {
-    const elements = document.querySelectorAll(this.MESSAGE_SELECTOR);
+    const elements = this.getMessageElements();
     const messages: Message[] = [];
-    const seenIds = new Set<string>();
 
     elements.forEach((el, index) => {
-      const container = el as HTMLElement;
-      const { role, id } = this.findIdAndRole(container);
-      
-      const msgId = id || `chatgpt-msg-${index}`;
-      if (seenIds.has(msgId)) return;
-      seenIds.add(msgId);
+      const role = this.getRole(el);
+      const clone = this.getContentElement(el).cloneNode(true) as HTMLElement;
 
-      // Encontrar el contenido real:
-      // - .markdown .prose para el asistente
-      // - El div que contiene el texto para el usuario (usualmente hijo de flex-col)
-      const contentEl = container.querySelector('.markdown, .prose') || 
-                        container.querySelector('.text-message') ||
-                        container.querySelector('.flex-col.gap-1.break-words') ||
-                        container;
+      clone.querySelectorAll(
+        `h4[data-conversation-role], .sr-only, .${this.CHECKBOX_CLASS}, ` +
+        'img[src*="faviconV2"], img[src*="favicon"]'
+      ).forEach(node => node.remove());
 
-      const clone = contentEl.cloneNode(true) as HTMLElement;
-      
-      // Limpieza exhaustiva de la UI de ChatGPT
-      clone.querySelectorAll('button, svg, .sr-only, .' + this.CHECKBOX_CLASS + ', [data-testid*="copy-button"], [data-testid*="voice-"], .text-token-text-tertiary').forEach(node => node.remove());
-      
-      // Limpiar bloques de código
+      // En ChatGPT el bloque de código suele tener una cabecera con botones.
       clone.querySelectorAll('pre').forEach(pre => {
         const code = pre.querySelector('code');
-        if (code) {
-          pre.innerHTML = '';
-          pre.appendChild(code);
-        }
+        if (!code) return;
+        pre.innerHTML = '';
+        pre.appendChild(code.cloneNode(true));
       });
 
+      const content = sanitizeMessageHtml(clone.innerHTML, role);
+      if (!hasMeaningfulContent(content)) return;
+
       messages.push({
-        id: msgId,
-        role: (role as Role) || 'user',
-        content: clone.innerHTML.trim()
+        id: this.getMessageId(el, index),
+        role,
+        content,
       });
     });
 
@@ -57,41 +129,36 @@ export class ChatGPTAdapter implements IAAdapter {
   }
 
   injectCheckboxes(onSelectionChange: (selectedIds: string[]) => void): void {
-    const elements = document.querySelectorAll(this.MESSAGE_SELECTOR);
-    
-    elements.forEach((el, index) => {
-      const container = el as HTMLElement;
+    this.getMessageElements().forEach((el, index) => {
+      const container = (el.parentElement as HTMLElement) || el;
       if (container.querySelector(`.${this.CHECKBOX_CLASS}`)) return;
 
       if (window.getComputedStyle(container).position === 'static') {
         container.style.position = 'relative';
       }
-      
+
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.className = this.CHECKBOX_CLASS;
-      
-      const { id } = this.findIdAndRole(container);
-      checkbox.dataset.id = id || `chatgpt-msg-${index}`;
-      
+      checkbox.dataset.id = this.getMessageId(el, index);
+
       Object.assign(checkbox.style, {
         position: 'absolute',
-        left: '10px',
+        right: '-30px',
         top: '10px',
-        zIndex: '9999',
+        zIndex: '1000',
         width: '22px',
         height: '22px',
         cursor: 'pointer',
         border: '2px solid #2563eb',
-        borderRadius: '4px'
+        borderRadius: '4px',
       });
 
-      checkbox.addEventListener('change', (e) => {
-        e.stopPropagation();
+      checkbox.addEventListener('change', () => {
         onSelectionChange(this.getSelectedMessageIds());
       });
 
-      container.prepend(checkbox);
+      container.appendChild(checkbox);
     });
   }
 
@@ -100,48 +167,22 @@ export class ChatGPTAdapter implements IAAdapter {
   }
 
   selectAll(select: boolean): void {
-    const checkboxes = document.querySelectorAll(`input.${this.CHECKBOX_CLASS}`);
-    checkboxes.forEach(cb => {
+    document.querySelectorAll(`input.${this.CHECKBOX_CLASS}`).forEach(cb => {
       (cb as HTMLInputElement).checked = select;
     });
   }
 
   getSelectedMessageIds(): string[] {
-    const checkboxes = document.querySelectorAll(`input.${this.CHECKBOX_CLASS}:checked`);
-    return Array.from(checkboxes).map(cb => (cb as HTMLInputElement).dataset.id || '');
+    return Array.from(document.querySelectorAll(`input.${this.CHECKBOX_CLASS}:checked`))
+      .map(cb => (cb as HTMLInputElement).dataset.id || '')
+      .filter(Boolean);
   }
 
   getConversationTitle(): string {
-    const titleEl = document.querySelector('[data-active="true"]') || 
-                    document.querySelector('nav li a.bg-token-sidebar-surface-tertiary') ||
-                    document.querySelector('h1') ||
-                    document.querySelector('title');
+    const titleEl = document.querySelector('[data-active="true"]') ||
+      document.querySelector('nav li a.bg-token-sidebar-surface-tertiary') ||
+      document.querySelector('h1') ||
+      document.querySelector('title');
     return titleEl?.textContent?.trim() || 'ChatGPT Conversation';
-  }
-
-  private findIdAndRole(e: HTMLElement): { role: string, id: string } {
-    // Buscar atributos directos
-    let role = e.getAttribute('data-message-author-role') || '';
-    let id = e.getAttribute('data-message-id') || '';
-
-    // Si no están, buscar en el primer descendiente que los tenga
-    if (!role || !id) {
-      const target = e.querySelector('[data-message-author-role], [data-message-id]');
-      if (target) {
-        role = role || target.getAttribute('data-message-author-role') || '';
-        id = id || target.getAttribute('data-message-id') || '';
-      }
-    }
-
-    // Fallback de rol basado en clases de Tailwind/ChatGPT
-    if (!role) {
-      if (e.querySelector('.assistant') || e.querySelector('.markdown') || e.querySelector('.prose')) {
-        role = 'assistant';
-      } else {
-        role = 'user';
-      }
-    }
-
-    return { role, id };
   }
 }

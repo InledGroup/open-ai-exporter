@@ -1,8 +1,108 @@
+html,
 body {
   margin: 0;
   padding: 0;
+  min-width: 340px;
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   background-color: #f9fafb;
+}
+
+/* Estilos base del popup. También se aplican a los estados de carga y error,
+   que no renderizan el <style> interno del estado normal. */
+.popup-container {
+  box-sizing: border-box;
+  width: 340px;
+  padding: 20px;
+  background: #ffffff;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.loading-state,
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 14px;
+  min-height: 200px;
+}
+
+.error-text {
+  color: #ef4444;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  margin: 0;
+  max-width: 280px;
+}
+
+.error-hint {
+  color: #6b7280;
+  font-size: 11px;
+  line-height: 1.5;
+  margin: -4px 0 0;
+  max-width: 280px;
+}
+
+.error-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 220px;
+}
+
+.btn-retry,
+.btn-reload {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.btn-retry:hover,
+.btn-reload:hover {
+  background: #ffffff;
+  border-color: #9ca3af;
+}
+
+.btn-reload {
+  background: #3ac200;
+  border-color: #3ac200;
+  color: #ffffff;
+}
+
+.btn-reload:hover {
+  background: #32a800;
+  border-color: #32a800;
+}
+
+.btn-retry:disabled,
+.btn-reload:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.spinner-green {
+  width: 32px;
+  height: 32px;
+  border: 4px solid #f3f4f6;
+  border-top-color: #3ac200;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .p-4 { padding: 1rem; }
@@ -16,6 +116,7 @@ body {
 button {
   display: block;
   width: 100%;
+  box-sizing: border-box;
   padding: 0.5rem 0.75rem;
   border-radius: 0.375rem;
   font-weight: 500;
