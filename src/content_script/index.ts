@@ -8,6 +8,7 @@ import { KimiAdapter } from '../export_conversation/infrastructure/adapters/Kimi
 import { DeepSeekAdapter } from '../export_conversation/infrastructure/adapters/DeepSeekAdapter';
 import { GoogleAIModeAdapter } from '../export_conversation/infrastructure/adapters/GoogleAIModeAdapter';
 import { IAAdapter } from '../core/domain/IAAdapter';
+import { inlineMessageImages } from '../core/infrastructure/inlineImages';
 import './style.css';
 
 const adapters: IAAdapter[] = [
@@ -84,9 +85,18 @@ browser.runtime.onMessage.addListener(async (request: any) => {
     if (activeAdapter) {
       try {
         const messages = await activeAdapter.getMessages();
+        // ChatGPT/Claude sirven algunas imágenes como blob: o desde CDNs que
+        // no se pueden leer desde el preview. Se incrustan aquí, en el origen
+        // de la página, antes de enviarlas al popup.
+        const messagesWithInlineImages = await Promise.all(
+          messages.map(async (message) => ({
+            ...message,
+            content: await inlineMessageImages(message.content),
+          })),
+        );
         const title = activeAdapter.getConversationTitle();
         const selectedIds = activeAdapter.getSelectedMessageIds();
-        return { messages, title, selectedIds, selectionModeEnabled };
+        return { messages: messagesWithInlineImages, title, selectedIds, selectionModeEnabled };
       } catch (err) {
         console.error('AI Exporter: Error obteniendo mensajes:', err);
         return null;

@@ -18,6 +18,7 @@ import {
   Star,
   ExternalLink,
   AlignLeft,
+  Globe,
 } from "lucide-preact";
 
 type ExportType = "md" | "pdf_advanced" | "word" | "word_basic" | "json" | "txt";
@@ -38,6 +39,11 @@ export function PopupApp() {
   } | null>(null);
   const [exporting, setExporting] = useState<ExportType | null>(null);
   const [wordMenuOpen, setWordMenuOpen] = useState<"main" | "selection" | null>(null);
+  const [pageInfo, setPageInfo] = useState<{
+    title: string;
+    url: string;
+    favIconUrl?: string;
+  } | null>(null);
   const exportService = new ExportService();
 
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -104,6 +110,15 @@ export function PopupApp() {
           canReload: false,
         });
         return;
+      }
+
+      const tab = await browser.tabs.get(tabId).catch(() => null);
+      if (tab) {
+        setPageInfo({
+          title: tab.title || "",
+          url: tab.url || "",
+          favIconUrl: tab.favIconUrl,
+        });
       }
 
       const response = await getMessagesFromTab(tabId);
@@ -327,6 +342,31 @@ export function PopupApp() {
 
   return (
     <div className="popup-container">
+      {pageInfo && (
+        <div className="page-info-card" title={pageInfo.url}>
+          <div className="page-info-favicon">
+            {pageInfo.favIconUrl ? (
+              <img
+                src={pageInfo.favIconUrl}
+                alt=""
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                }}
+              />
+            ) : (
+              <Globe size={16} color="#6b7280" />
+            )}
+          </div>
+          <div className="page-info-text">
+            <div className="page-info-title">
+              {pageInfo.title || "AI Exporter"}
+            </div>
+            <div className="page-info-url">{pageInfo.url}</div>
+          </div>
+        </div>
+      )}
+
       <header className="popup-header">
         <div className="header-logo-container">
           <img src="aiexporter.png" className="app-logo" alt="logo" />
@@ -560,6 +600,58 @@ export function PopupApp() {
           text-align: center;
           gap: 12px;
           min-height: 200px;
+        }
+
+        .page-info-card {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          padding: 8px 10px;
+          margin-bottom: 16px;
+          background: #f9fafb;
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          min-width: 0;
+        }
+
+        .page-info-favicon {
+          width: 20px;
+          height: 20px;
+          flex: 0 0 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .page-info-favicon img {
+          width: 18px;
+          height: 18px;
+          object-fit: contain;
+          border-radius: 3px;
+        }
+
+        .page-info-text {
+          min-width: 0;
+          flex: 1;
+        }
+
+        .page-info-title,
+        .page-info-url {
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+        }
+
+        .page-info-title {
+          font-size: 11px;
+          font-weight: 700;
+          color: var(--text-dark);
+        }
+
+        .page-info-url {
+          font-size: 9px;
+          color: var(--text-muted);
+          margin-top: 1px;
         }
 
         .popup-header {

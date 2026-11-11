@@ -48,15 +48,20 @@ export class ChatGPTAdapter implements IAAdapter {
     return el.querySelector('.markdown, .prose') ? 'assistant' : 'user';
   }
 
+  /**
+   * Devuelve el turno completo del mensaje. El bloque
+   * [data-content-search-unit-key] sólo contiene el texto; las imágenes
+   * adjuntas o generadas viven en otros hijos del mismo turno, así que hay
+   * que clonar el turno entero para no perderlas.
+   */
   private getContentElement(el: HTMLElement): HTMLElement {
-    if (el.getAttribute('data-conversation-role') === 'user') {
-      return (el.parentElement?.querySelector('[data-user-message-bubble="true"]') as HTMLElement) ||
-        (el.parentElement as HTMLElement) ||
-        el;
-    }
+    const article = el.closest('article');
+    if (article) return article as HTMLElement;
 
-    const unit = el.closest('[data-content-search-unit-key]');
-    if (unit) return unit as HTMLElement;
+    const turn = el.closest(
+      '[data-testid^="conversation-turn"], [data-testid*="conversation-turn"], [data-turn]'
+    );
+    if (turn) return turn as HTMLElement;
 
     // Compatibilidad con el DOM anterior.
     return (el.parentElement as HTMLElement) || el;
@@ -94,8 +99,43 @@ export class ChatGPTAdapter implements IAAdapter {
     return host.includes('chatgpt.com') || host.includes('chat.openai.com');
   }
 
+  /**
+   * ChatGPT inserta las imágenes generadas/adjuntas un poco después del
+   * texto, y la URL blob: tarda un instante en estar disponible. Si se clona
+   * el turno demasiado pronto, la imagen se pierde.
+   */
+  private async waitForImages(elements: HTMLElement[]): Promise<void> {
+    const started = Date.now();
+    const maxWait = 5000;
+    const noImageGrace = 1800;
+
+    while (Date.now() - started < maxWait) {
+      const images = elements.flatMap((el) =>
+        Array.from(el.querySelectorAll('img'))
+      ).filter((img) => {
+        const src = img.currentSrc || img.src || '';
+        return (src.startsWith('blob:') || /^https?:/i.test(src)) &&
+          !/favicon/i.test(src);
+      });
+
+      if (images.length > 0) {
+        const pending = images.some((img) => !img.complete || img.naturalWidth === 0);
+        if (!pending) {
+          // Pequeña espera extra por si se añade otra imagen del mismo turno.
+          await new Promise((resolve) => setTimeout(resolve, 150));
+          return;
+        }
+      } else if (Date.now() - started >= noImageGrace) {
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+  }
+
   async getMessages(): Promise<Message[]> {
     const elements = this.getMessageElements();
+    await this.waitForImages(elements);
     const messages: Message[] = [];
 
     elements.forEach((el, index) => {
@@ -137,6 +177,7 @@ export class ChatGPTAdapter implements IAAdapter {
         container.style.position = 'relative';
       }
 
+      const isUser = this.getRole(el) === 'user';
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.className = this.CHECKBOX_CLASS;
@@ -144,8 +185,12 @@ export class ChatGPTAdapter implements IAAdapter {
 
       Object.assign(checkbox.style, {
         position: 'absolute',
-        right: '-30px',
-        top: '10px',
+        // El contenedor de ChatGPT ocupa todo el ancho. Colocar el checkbox
+        // fuera del contenedor lo deja invisible; se ancla al borde interior
+        // del lado correspondiente al rol.
+        left: isUser ? 'auto' : '6px',
+        right: isUser ? '6px' : 'auto',
+        top: '6px',
         zIndex: '1000',
         width: '22px',
         height: '22px',

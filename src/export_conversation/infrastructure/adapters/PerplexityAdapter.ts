@@ -9,8 +9,9 @@ export class PerplexityAdapter implements IAAdapter {
   }
 
   private extractConversationId(): string {
-    const n = window.location.href.match(/\/search\/([^\/?#]+)/);
-    if (!n) throw new Error("无法从URL中提取 thread ID");
+    // Las conversaciones nuevas usan /session/<uuid>; las antiguas /search/<slug>.
+    const n = window.location.href.match(/\/(?:search|session)\/([^\/?#]+)/);
+    if (!n) throw new Error("No se pudo extraer el ID de la conversación de Perplexity");
     return n[1];
   }
 

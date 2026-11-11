@@ -25,6 +25,22 @@ export class GeminiAdapter implements IAAdapter {
       // El proceso de pensamiento no forma parte de la respuesta
       clone.querySelectorAll('model-thoughts, .model-thoughts, .thinking, .thoughts, thinking-overlay').forEach(th => th.remove());
 
+      // Las imágenes generadas por Gemini pueden tener la URL real en srcset
+      // o currentSrc (lazy load). El clon no conserva currentSrc, así que se
+      // copia desde el elemento original antes de sanitizar.
+      const originalImages = Array.from(el.querySelectorAll('img'));
+      const clonedImages = Array.from(clone.querySelectorAll('img'));
+      clonedImages.forEach((img, imageIndex) => {
+        const original = originalImages[imageIndex];
+        if (!original) return;
+
+        const realSrc = original.currentSrc ||
+          original.getAttribute('data-src') ||
+          original.getAttribute('data-lazy-src') ||
+          original.getAttribute('src');
+        if (realSrc) img.setAttribute('src', realSrc);
+      });
+
       // Gemini ha cambiado varias veces los contenedores internos. Clonar el
       // bloque completo (user-query / model-response) es lo más estable y es
       // lo que hace la extensión de referencia. El sanitizador se encarga de

@@ -1,3 +1,4 @@
+import browser from 'webextension-polyfill';
 import TurndownService from 'turndown';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -274,11 +275,19 @@ export class ExportService {
     if (!src) return null;
 
     try {
-      const response = await fetch(src, { credentials: 'omit' });
-      if (!response.ok) return null;
+      let blob = await this.fetchImageBlob(src);
+      if (!blob) return null;
 
-      const blob = await response.blob();
-      const type = this.getDocxImageType(blob.type, src);
+      let type = this.getDocxImageType(blob.type, src);
+
+      // Word no admite webp/avif. Gemini suele servir las imágenes generadas
+      // en webp, por lo que antes se perdían y se exportaba sólo el alt.
+      if (!type && blob.type.startsWith('image/')) {
+        const png = await this.convertToPng(blob);
+        if (!png) return null;
+        blob = png;
+        type = 'png';
+      }
       if (!type) return null;
 
       const data = new Uint8Array(await blob.arrayBuffer());
@@ -297,6 +306,62 @@ export class ExportService {
     } catch (err) {
       console.warn('AI Exporter: no se pudo incrustar una imagen en Word', err);
       return null;
+    }
+  }
+
+  /**
+   * El preview es una página de extensión: muchas imágenes de ChatGPT o Gemini
+   * no se pueden descargar desde ahí por CORS o por requerir la sesión de la
+   * web. El service worker sí tiene permisos de host y sesión, así que se usa
+   * como intermediario y se conserva el fetch directo como último recurso.
+   */
+  private async fetchImageBlob(src: string): Promise<Blob | null> {
+    if (/^https?:\/\//i.test(src)) {
+      try {
+        const result = await browser.runtime.sendMessage({
+          type: 'AI_EXPORTER_FETCH_IMAGE',
+          url: src,
+        }) as { ok?: boolean; dataUrl?: string };
+
+        if (result?.ok && result.dataUrl) {
+          const response = await fetch(result.dataUrl);
+          if (response.ok) return await response.blob();
+        }
+      } catch (err) {
+        console.warn('AI Exporter: fallo la descarga de imagen vía background', err);
+      }
+    }
+
+    const response = await fetch(src, { credentials: 'omit' });
+    return response.ok ? await response.blob() : null;
+  }
+
+  private async convertToPng(blob: Blob): Promise<Blob | null> {
+    const url = URL.createObjectURL(blob);
+
+    try {
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = url;
+      });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = image.naturalWidth || 1;
+      canvas.height = image.naturalHeight || 1;
+      const context = canvas.getContext('2d');
+      if (!context) return null;
+      context.drawImage(image, 0, 0);
+
+      return await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob((png) => resolve(png), 'image/png');
+      });
+    } catch (err) {
+      console.warn('AI Exporter: no se pudo convertir una imagen a PNG', err);
+      return null;
+    } finally {
+      URL.revokeObjectURL(url);
     }
   }
 

@@ -158,9 +158,13 @@ export function PreviewPage() {
     const mainWrapper = document.querySelector(".preview-container");
     const pdfContent = document.getElementById("preview-content");
     if (mainWrapper) mainWrapper.classList.add("exporting-pdf");
-    // El class debe ir también en el elemento que captura html2canvas;
-    // si sólo está en un ancestro, el clon del PDF no hereda los estilos.
-    if (pdfContent) pdfContent.classList.toggle("pdf-flat", style === "flat");
+    // Las clases deben ir también en el elemento que captura html2canvas;
+    // si sólo están en un ancestro, el clon del PDF no hereda los estilos
+    // (y las imágenes se parten entre páginas).
+    if (pdfContent) {
+      pdfContent.classList.add("exporting-pdf");
+      pdfContent.classList.toggle("pdf-flat", style === "flat");
+    }
 
     // Wait a bit for the UI to update
     setTimeout(async () => {
@@ -179,7 +183,10 @@ export function PreviewPage() {
         alert("Error generating PDF");
       } finally {
         if (mainWrapper) mainWrapper.classList.remove("exporting-pdf");
-        if (pdfContent) pdfContent.classList.remove("pdf-flat");
+        if (pdfContent) {
+          pdfContent.classList.remove("exporting-pdf");
+          pdfContent.classList.remove("pdf-flat");
+        }
       }
     }, 800);
   };
@@ -764,7 +771,8 @@ export function PreviewPage() {
           display: none !important;
         }
 
-        .exporting-pdf .preview-content-area {
+        .exporting-pdf .preview-content-area,
+        .preview-content-area.exporting-pdf {
           box-shadow: none !important;
           padding: 40px !important;
           border-radius: 0 !important;
@@ -918,6 +926,31 @@ export function PreviewPage() {
           color: #1f2937;
           border: 1px solid var(--border-color);
           border-top-left-radius: 4px;
+        }
+
+        .content img {
+          display: block;
+          max-width: 100%;
+          height: auto;
+          margin: 10px 0;
+          border-radius: 8px;
+          object-fit: contain;
+        }
+
+        .content picture {
+          display: block;
+          max-width: 100%;
+        }
+
+        /* html2pdf corta el lienzo por páginas; una imagen más alta que la
+           página aparece partida. Se limita también su altura. */
+        .exporting-pdf .content img {
+          max-width: 100% !important;
+          max-height: 165mm !important;
+          width: auto !important;
+          height: auto !important;
+          break-inside: avoid;
+          page-break-inside: avoid;
         }
 
         .content pre {

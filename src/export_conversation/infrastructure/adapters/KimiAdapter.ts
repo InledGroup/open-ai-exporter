@@ -4,12 +4,18 @@ import { Message, Role } from "../../../core/domain/entities";
 export class KimiAdapter implements IAAdapter {
   private readonly CHECKBOX_CLASS = "ai-exporter-checkbox";
   private renderedIds: string[] = [];
-  private readonly DEFAULT_LIST_MESSAGES_URL =
-    "https://kimi.com/apiv2/kimi.gateway.chat.v1.ChatService/ListMessages";
 
   isCurrentPage(): boolean {
     const host = window.location.hostname;
-    return host.includes("kimi.com") || host.includes("moonshot.cn");
+    return host.includes("kimi.com") ||
+      host.includes("kimi.ai") ||
+      host.includes("moonshot.cn");
+  }
+
+  private getApiOrigin(): string {
+    return window.location.hostname.includes("kimi.ai")
+      ? "https://www.kimi.ai"
+      : "https://www.kimi.com";
   }
 
   private normalizeMath(text: string): string {
@@ -18,10 +24,17 @@ export class KimiAdapter implements IAAdapter {
       .replace(/\\\(([\s\S]*?)\\\)/g, "$ $1 $");
   }
 
-  private getAuthTokenFromCookie(): string | null {
+  private getAuthToken(): string | null {
     try {
-      const n = document.cookie.match(/kimi-auth=([^;]+)/);
-      if (n) return `Bearer ${n[1]}`;
+      // La versión nueva de Kimi (kimi.ai) guarda el token en localStorage.
+      const stored = localStorage.getItem("access_token");
+      if (stored) {
+        return stored.startsWith("Bearer ") ? stored : `Bearer ${stored}`;
+      }
+
+      // Compatibilidad con la versión anterior, que usaba una cookie.
+      const cookie = document.cookie.match(/(?:^|;\s*)kimi-auth=([^;]+)/);
+      if (cookie) return `Bearer ${cookie[1]}`;
     } catch {}
     return null;
   }
@@ -34,25 +47,29 @@ export class KimiAdapter implements IAAdapter {
 
   async getMessages(): Promise<Message[]> {
     const chat_id = this.extractConversationId();
-    const token = this.getAuthTokenFromCookie();
+    const token = this.getAuthToken();
     if (!token)
       throw new Error(
         "Failed to get Kimi auth token. Please make sure you are logged in.",
       );
 
-    const response = await fetch(this.DEFAULT_LIST_MESSAGES_URL, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        accept: "*/*",
-        authorization: token,
-        "content-type": "application/json",
-        origin: "https://kimi.com",
-        "x-msh-platform": "web",
-        "x-msh-version": "1.0.0",
+    const apiOrigin = this.getApiOrigin();
+    const response = await fetch(
+      `${apiOrigin}/apiv2/kimi.gateway.chat.v1.ChatService/ListMessages`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          accept: "*/*",
+          authorization: token,
+          "content-type": "application/json",
+          origin: apiOrigin,
+          "x-msh-platform": "web",
+          "x-msh-version": "1.0.0",
+        },
+        body: JSON.stringify({ chat_id, page_size: 1000 }),
       },
-      body: JSON.stringify({ chat_id, page_size: 1000 }),
-    });
+    );
 
     if (!response.ok)
       throw new Error(`Kimi API request failed: ${response.status}`);
